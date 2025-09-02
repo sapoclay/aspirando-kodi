@@ -11,6 +11,35 @@ import shutil
 import json
 import subprocess
 import re
+import datetime
+from buffering import (
+    get_default_kodi_values,
+    configure_basic_buffering,
+    configure_advanced_buffering,
+    show_current_buffering_config,
+    show_buffering_values,
+    get_usb_autoclean_enabled,
+    toggle_usb_autoclean,
+    clean_usb_cachepath,
+    optimize_buffering_auto,
+    backup_advancedsettings,
+    restore_advancedsettings_interactive,
+    test_usb_cachepath,
+    configure_usb_cachepath,
+    choose_speed_server,
+    speed_test_and_recommend,
+    streaming_mode_adjust,
+    view_special_temp_cache,
+    redirect_temp_cache_to_usb,
+    revert_temp_cache_redirection,
+    test_special_temp_cache_write,
+    save_buffering_config_to_usb,
+    remove_buffering_config,
+    detect_usb_devices,
+    _translate as buffering_translate,
+    temp_status_short as _temp_status_short,
+    special_temp_path as _special_temp_path,
+)
 
 # Configuración del addon
 addon = xbmcaddon.Addon()
@@ -118,7 +147,8 @@ def get_kodi_paths():
             'thumbnails': os.path.join(kodi_data_path, 'Thumbnails'),
             # Paquetes están fuera de userdata normalmente
             'packages': os.path.join(_translate('special://home/'), 'addons', 'packages'),
-            'temp': os.path.join(kodi_data_path, 'temp'),
+            # Ruta real de temp debe venir de special://temp/
+            'temp': _translate('special://temp/'),
             'log': os.path.join(kodi_data_path, 'kodi.log'),
             'advancedsettings': os.path.join(kodi_data_path, 'advancedsettings.xml')
         }
@@ -180,180 +210,13 @@ def get_temp_info():
     
     return size, files
 
-def get_default_kodi_values():
-    """Obtiene los valores por defecto de Kodi para buffering"""
-    defaults = {
-        'buffermode': '1 (Buffer todo tipo de contenido)',
-        'cachemembuffersize': '20971520 (20 MB)',
-        'readbufferfactor': '4.0 (Factor estándar)',
-        'memorysize': '20971520 (20 MB)',
-        'description': 'Configuración por defecto de Kodi'
-    }
-    return defaults
+## Funciones de buffering ahora viven en buffering.py
 
-def detect_usb_devices():
-    """Detecta dispositivos USB conectados de forma robusta"""
-    usb_devices = []
-    try:
-        log('Iniciando detección de dispositivos USB')
-        
-        # Método 1: Verificar directorios comunes de montaje
-        mount_bases = ['/media', '/mnt', '/run/media']
-        
-        for base_path in mount_bases:
-            if os.path.exists(base_path):
-                log('Verificando directorio: %s' % base_path)
-                try:
-                    for user_dir in os.listdir(base_path):
-                        user_path = os.path.join(base_path, user_dir)
-                        if os.path.isdir(user_path):
-                            # Si es /run/media, buscar subdirectorios de usuario
-                            if base_path == '/run/media':
-                                try:
-                                    for device_dir in os.listdir(user_path):
-                                        device_path = os.path.join(user_path, device_dir)
-                                        if os.path.isdir(device_path) and os.access(device_path, os.W_OK):
-                                            usb_info = get_usb_info(device_path, device_dir)
-                                            if usb_info and not any(usb['path'] == device_path for usb in usb_devices):
-                                                usb_devices.append(usb_info)
-                                                log('USB encontrado en /run/media: %s' % device_path)
-                                except:
-                                    continue
-                            else:
-                                # Para /media y /mnt, verificar directamente
-                                if os.access(user_path, os.W_OK):
-                                    # Verificar que es un punto de montaje real
-                                    try:
-                                        # Intentar crear un archivo de prueba
-                                        test_file = os.path.join(user_path, '.aspirando_test')
-                                        with open(test_file, 'w') as f:
-                                            f.write('test')
-                                        os.remove(test_file)
-                                        
-                                        usb_info = get_usb_info(user_path, user_dir)
-                                        if usb_info and not any(usb['path'] == user_path for usb in usb_devices):
-                                            usb_devices.append(usb_info)
-                                            log('USB encontrado: %s' % user_path)
-                                    except:
-                                        continue
-                except Exception as e:
-                    log('Error listando %s: %s' % (base_path, str(e)))
-                    continue
-        
-        # Método 2: Usar mount para obtener puntos de montaje
-        try:
-            with open('/proc/mounts', 'r') as f:
-                mounts = f.read()
-            
-            for line in mounts.split('\n'):
-                if line.strip():
-                    parts = line.split()
-                    if len(parts) >= 3:
-                        device = parts[0]
-                        mountpoint = parts[1]
-                        fstype = parts[2]
-                        
-                        # Buscar dispositivos que parezcan USBs
-                        if (mountpoint.startswith('/media/') or 
-                            mountpoint.startswith('/mnt/') or 
-                            mountpoint.startswith('/run/media/')) and \
-                           fstype in ['vfat', 'ntfs', 'exfat', 'ext4', 'ext3', 'ext2']:
-                            
-                            if os.path.exists(mountpoint) and os.access(mountpoint, os.W_OK):
-                                try:
-                                    # Prueba de escritura
-                                    test_file = os.path.join(mountpoint, '.aspirando_test')
-                                    with open(test_file, 'w') as f:
-                                        f.write('test')
-                                    os.remove(test_file)
-                                    
-                                    name = os.path.basename(mountpoint)
-                                    usb_info = get_usb_info(mountpoint, name)
-                                    if usb_info and not any(usb['path'] == mountpoint for usb in usb_devices):
-                                        usb_devices.append(usb_info)
-                                        log('USB encontrado en /proc/mounts: %s' % mountpoint)
-                                except:
-                                    continue
-        except Exception as e:
-            log('Error leyendo /proc/mounts: %s' % str(e))
-        
-        log('Total USBs detectados: %d' % len(usb_devices))
-        for i, usb in enumerate(usb_devices):
-            log('USB %d: %s en %s (%s)' % (i+1, usb['name'], usb['path'], usb.get('size', 'Tamaño desconocido')))
-            
-    except Exception as e:
-        log('Error general detectando USBs: %s' % str(e))
-    
-    return usb_devices
+## detect_usb_devices ahora en buffering.detect_usb_devices
 
-def _browse_for_usb_folder():
-    """Permite al usuario elegir manualmente una carpeta (USB) cuando la detección falla."""
-    try:
-        dialog = xbmcgui.Dialog()
-        # Intentar diálogo de exploración de carpetas
-        try:
-            # En Kodi, browse para carpetas suele ser type=3
-            path = dialog.browse(3, 'Selecciona carpeta en tu USB', 'files', '', False, True, '/media')
-        except Exception:
-            path = ''
-        if path and isinstance(path, str) and os.path.isdir(path):
-            return path
-        # Fallback: pedir ruta manualmente
-        path = dialog.input('Introduce ruta del USB (p. ej. /media/USUARIO/NOMBRE)', type=xbmcgui.INPUT_ALPHANUM)
-        if path and os.path.isdir(path):
-            return path
-    except Exception as e:
-        log('Error en _browse_for_usb_folder: %s' % str(e))
-    return None
+## browse_for_usb_folder ahora en buffering
 
-def get_usb_info(path, name):
-    """Obtiene información de un dispositivo USB de forma segura"""
-    try:
-        if not os.path.exists(path):
-            return None
-            
-        if not os.access(path, os.W_OK):
-            return None
-        
-        # Verificar que podemos escribir realmente
-        try:
-            test_file = os.path.join(path, '.aspirando_write_test')
-            with open(test_file, 'w') as f:
-                f.write('test')
-            os.remove(test_file)
-        except:
-            return None
-            
-        # Obtener espacio disponible
-        try:
-            stat = os.statvfs(path)
-            total_space = stat.f_frsize * stat.f_blocks
-            free_space = stat.f_frsize * stat.f_bavail
-            
-            return {
-                'name': name,
-                'path': path,
-                'size': format_size(total_space),
-                'free': format_size(free_space),
-                'device': name,
-                'total_bytes': total_space,
-                'free_bytes': free_space
-            }
-        except Exception as e:
-            log('Error obteniendo estadísticas de %s: %s' % (path, str(e)))
-            return {
-                'name': name,
-                'path': path,
-                'size': 'Desconocido',
-                'free': 'Desconocido',
-                'device': name,
-                'total_bytes': 0,
-                'free_bytes': 0
-            }
-            
-    except Exception as e:
-        log('Error obteniendo info de USB %s: %s' % (path, str(e)))
-        return None
+## get_usb_info ahora en buffering
 
     
 
@@ -730,192 +593,201 @@ def manage_buffering():
             dialog = xbmcgui.Dialog()
             paths = get_kodi_paths()
             advancedsettings_path = paths.get('advancedsettings', '')
-            
-            # Verificar si existe advancedsettings.xml
-            current_config = "No configurado"
-            if os.path.exists(advancedsettings_path):
-                current_config = "Configurado"
-            
-            # Mostrar opciones de buffering
-            opciones = [
-                'Ver configuración actual',
-                'Ver valores de advancedsettings.xml',
-                'Configurar buffering básico',
-                'Configurar buffering avanzado',
-                'Guardar configuración en USB',
-                'Configurar USB como cache (directo)',
-                'Crear copia de seguridad',
-                'Restaurar copia de seguridad',
-                'Eliminar configuración de buffering',
-                'Diagnóstico USB',
-                'Test de velocidad y recomendación',
-                'Test de velocidad (elegir servidor)',
-                'Modo streaming (ajuste por bitrate)',
-                'Optimización automática de buffering',
-                'Volver al menú principal'
+
+            current_config = "Configurado" if os.path.exists(advancedsettings_path) else "No configurado"
+            auto_clean = 'ON' if get_usb_autoclean_enabled() else 'OFF'
+            temp_hint = _temp_status_short()
+
+            # Submenús como funciones internas para claridad
+            def submenu_estado():
+                while True:
+                    label_temp_status = 'Estado de caché temp: %s' % _temp_status_short()
+                    opciones = [
+                        'Ver configuración actual',
+                        'Ver valores de advancedsettings.xml',
+                        label_temp_status,
+                        'Ver caché actual (special://temp)',
+                        'Probar escritura en special://temp/cache',
+                        'Volver'
+                    ]
+                    i = dialog.select('Estado y visualización', opciones)
+                    if i in (-1, len(opciones)-1):
+                        break
+                    if i == 0:
+                        show_current_buffering_config(advancedsettings_path)
+                    elif i == 1:
+                        show_buffering_values(advancedsettings_path)
+                    elif i == 2:
+                        try:
+                            temp_root = _special_temp_path()
+                            is_link = os.path.islink(temp_root)
+                            target = os.path.realpath(temp_root) if is_link else temp_root
+                            msg = ['Estado de special://temp', '']
+                            msg.append('Ruta: %s' % temp_root)
+                            msg.append('Tipo: %s' % ('ENLACE (symlink)' if is_link else 'Local'))
+                            if is_link:
+                                msg.append('Destino: %s' % target)
+                                cache_dir = os.path.join(target, 'cache')
+                                msg.append('Destino/cache existe: %s' % ('Sí' if os.path.exists(cache_dir) else 'No'))
+                            xbmcgui.Dialog().textviewer('Estado de special://temp', '\n'.join(msg))
+                        except Exception as e:
+                            log('Error mostrando estado temp: %s' % str(e))
+                            xbmcgui.Dialog().ok('Error', 'No se pudo obtener el estado de temp')
+                    elif i == 3:
+                        view_special_temp_cache()
+                    elif i == 4:
+                        test_special_temp_cache_write()
+
+            def submenu_config():
+                while True:
+                    opciones = [
+                        'Configurar buffering básico',
+                        'Configurar buffering avanzado',
+                        'Modo streaming (ajuste por bitrate)',
+                        'Optimización automática de buffering',
+                        'Volver'
+                    ]
+                    i = dialog.select('Configuración de buffering', opciones)
+                    if i in (-1, len(opciones)-1):
+                        break
+                    if i == 0:
+                        configure_basic_buffering(advancedsettings_path)
+                    elif i == 1:
+                        configure_advanced_buffering(advancedsettings_path)
+                    elif i == 2:
+                        streaming_mode_adjust(advancedsettings_path)
+                    elif i == 3:
+                        optimize_buffering_auto(advancedsettings_path)
+
+            def submenu_usb():
+                while True:
+                    opciones = [
+                        'Guardar configuración en USB',
+                        'Configurar USB como cache (directo)',
+                        'Probar cache USB (lectura/escritura)',
+                        'Auto-limpiar cache USB al parar reproducción (%s)' % ('ON' if get_usb_autoclean_enabled() else 'OFF'),
+                        'Limpiar cache USB ahora',
+                        'Volver'
+                    ]
+                    i = dialog.select('Cache en USB', opciones)
+                    if i in (-1, len(opciones)-1):
+                        break
+                    if i == 0:
+                        save_buffering_config_to_usb(advancedsettings_path)
+                    elif i == 1:
+                        configure_usb_cachepath(advancedsettings_path)
+                    elif i == 2:
+                        test_usb_cachepath(advancedsettings_path)
+                    elif i == 3:
+                        toggle_usb_autoclean()
+                    elif i == 4:
+                        clean_usb_cachepath(advancedsettings_path)
+
+            def submenu_speed_diag():
+                while True:
+                    opciones = [
+                        'Test de velocidad y recomendación',
+                        'Test de velocidad (elegir servidor)',
+                        'Diagnóstico USB',
+                        'Volver'
+                    ]
+                    i = dialog.select('Velocidad y diagnóstico', opciones)
+                    if i in (-1, len(opciones)-1):
+                        break
+                    if i == 0:
+                        speed_test_and_recommend(advancedsettings_path)
+                    elif i == 1:
+                        urls = choose_speed_server()
+                        if urls:
+                            speed_test_and_recommend(advancedsettings_path, urls)
+                    elif i == 2:
+                        show_usb_diagnostic()
+
+            def submenu_temp_redirect():
+                while True:
+                    opciones = [
+                        'Redirigir caché a USB (enlace simbólico)',
+                        'Revertir redirección de caché (temp local)',
+                        'Volver'
+                    ]
+                    i = dialog.select('Redirección de special://temp', opciones)
+                    if i in (-1, len(opciones)-1):
+                        break
+                    if i == 0:
+                        redirect_temp_cache_to_usb()
+                    elif i == 1:
+                        revert_temp_cache_redirection()
+
+            def submenu_timeshift():
+                while True:
+                    opciones = [
+                        'Abrir ajustes de Timeshift (PVR & TV en directo)',
+                        'Volver'
+                    ]
+                    i = dialog.select('PVR / Timeshift', opciones)
+                    if i in (-1, len(opciones)-1):
+                        break
+                    if i == 0:
+                        open_timeshift_settings()
+
+            def submenu_backups():
+                while True:
+                    opciones = [
+                        'Crear copia de seguridad',
+                        'Restaurar copia de seguridad',
+                        'Eliminar configuración de buffering',
+                        'Volver'
+                    ]
+                    i = dialog.select('Copias de seguridad', opciones)
+                    if i in (-1, len(opciones)-1):
+                        break
+                    if i == 0:
+                        backup_advancedsettings(advancedsettings_path, manual=True)
+                    elif i == 1:
+                        restore_advancedsettings_interactive(advancedsettings_path)
+                    elif i == 2:
+                        remove_buffering_config(advancedsettings_path)
+
+            # Menú principal de gestión de buffering (agrupado)
+            categorias = [
+                'Estado y visualización (%s)' % temp_hint,
+                'Configuración de buffering (%s)' % current_config,
+                'Cache en USB (AutoClean: %s)' % auto_clean,
+                'Velocidad y diagnóstico',
+                'Redirección de temp a USB',
+                'PVR / Timeshift',
+                'Copias de seguridad',
+                'Volver'
             ]
-            
-            seleccion = dialog.select('Gestión de Buffering (%s)' % current_config, opciones)
-            
-            # Usuario canceló o seleccionó volver
-            if seleccion == -1 or seleccion == len(opciones) - 1:
-                log('Usuario salió de gestión de buffering')
+
+            seleccion = dialog.select('Gestión de Buffering', categorias)
+
+            if seleccion in (-1, len(categorias)-1):
+                log('Usuario salió de gestión de buffering (agrupado)')
                 break
-            
-            if seleccion == 0:  # Ver configuración actual
-                show_current_buffering_config(advancedsettings_path)
-            elif seleccion == 1:  # Ver valores de advancedsettings.xml
-                log('Usuario seleccionó: Ver valores de advancedsettings.xml')
-                show_buffering_values(advancedsettings_path)
-            elif seleccion == 2:  # Configuración básica
-                configure_basic_buffering(advancedsettings_path)
-            elif seleccion == 3:  # Configuración avanzada
-                configure_advanced_buffering(advancedsettings_path)
-            elif seleccion == 4:  # Guardar en USB
-                save_buffering_config_to_usb(advancedsettings_path)
-            elif seleccion == 5:  # Configurar USB como cache (directo)
-                log('Usuario seleccionó: Configurar USB como cache (directo)')
-                configure_usb_cachepath(advancedsettings_path)
-            elif seleccion == 6:  # Crear backup
-                log('Usuario seleccionó: Crear copia de seguridad')
-                backup_advancedsettings(advancedsettings_path, manual=True)
-            elif seleccion == 7:  # Restaurar backup
-                log('Usuario seleccionó: Restaurar copia de seguridad')
-                restore_advancedsettings_interactive(advancedsettings_path)
-            elif seleccion == 8:  # Eliminar configuración
-                remove_buffering_config(advancedsettings_path)
-            elif seleccion == 9:  # Diagnóstico USB
-                log('Usuario seleccionó: Diagnóstico USB (desde Gestión de Buffering)')
-                show_usb_diagnostic()
-            elif seleccion == 10:  # Test de velocidad y recomendación
-                log('Usuario seleccionó: Test de velocidad y recomendación')
-                speed_test_and_recommend(advancedsettings_path)
-            elif seleccion == 11:  # Test de velocidad (elegir servidor)
-                log('Usuario seleccionó: Test con servidor elegido')
-                urls = choose_speed_server()
-                if urls:
-                    speed_test_and_recommend(advancedsettings_path, urls)
-            elif seleccion == 12:  # Modo streaming (bitrate)
-                log('Usuario seleccionó: Modo streaming (bitrate)')
-                streaming_mode_adjust(advancedsettings_path)
-            elif seleccion == 13:  # Optimización automática
-                log('Usuario seleccionó: Optimización automática de buffering')
-                optimize_buffering_auto(advancedsettings_path)
+
+            if seleccion == 0:
+                submenu_estado()
+            elif seleccion == 1:
+                submenu_config()
+            elif seleccion == 2:
+                submenu_usb()
+            elif seleccion == 3:
+                submenu_speed_diag()
+            elif seleccion == 4:
+                submenu_temp_redirect()
+            elif seleccion == 5:
+                submenu_timeshift()
+            elif seleccion == 6:
+                submenu_backups()
             
     except Exception as e:
         log('Error gestionando buffering: %s' % str(e))
         xbmcgui.Dialog().ok('Error', 'Error gestionando buffering: %s' % str(e))
 
-def show_current_buffering_config(config_path):
-    """Muestra la configuración actual de buffering"""
-    try:
-        if not os.path.exists(config_path):
-            # Mostrar valores por defecto de Kodi
-            defaults = get_default_kodi_values()
-            
-            default_info = ('CONFIGURACIÓN POR DEFECTO DE KODI\n\n'
-                           'Buffer Mode: %s\n'
-                           'Cache Memory Buffer: %s\n'
-                           'Read Buffer Factor: %s\n'
-                           'Video Memory Size: %s\n\n'
-                           'Nota: Estos son los valores que Kodi\n'
-                           'utiliza cuando no hay configuración\n'
-                           'personalizada (advancedsettings.xml).\n\n'
-                           'Para optimizar el rendimiento, puedes\n'
-                           'crear una configuración personalizada\n'
-                           'usando las opciones del menú.') % (
-                               defaults['buffermode'],
-                               defaults['cachemembuffersize'], 
-                               defaults['readbufferfactor'],
-                               defaults['memorysize']
-                           )
-            
-            xbmcgui.Dialog().textviewer('Configuración Actual - Valores por Defecto', default_info)
-            return
-        
-        # Mostrar configuración personalizada existente
-        with open(config_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        # Calcular resumen de valores parseados
-        values = parse_advancedsettings_values(config_path)
-        lines = [
-            'CONFIGURACIÓN PERSONALIZADA ACTIVA',
-            '=====================================',
-            '',
-            'VALORES DETECTADOS:'
-        ]
-        for k, v in values.items():
-            lines.append('• %s: %s' % (k, v))
-        lines.append('')
-        lines.append('--- Contenido XML ---')
-        lines.append(content)
-        xbmcgui.Dialog().textviewer('Configuración Actual - Personalizada', '\n'.join(lines))
-        
-    except Exception as e:
-        log('Error mostrando configuración: %s' % str(e))
-        xbmcgui.Dialog().ok('Error', 'Error leyendo configuración: %s' % str(e))
+## show_current_buffering_config ahora proviene de buffering
 
-def configure_basic_buffering(config_path):
-    """Configura buffering básico para mejorar reproducción"""
-    try:
-        # Configuración básica recomendada
-        basic_config = '''<advancedsettings>
-    <network>
-        <buffermode>1</buffermode>
-        <cachemembuffersize>52428800</cachemembuffersize>
-        <readbufferfactor>4.0</readbufferfactor>
-    </network>
-    <video>
-        <memorysize>52428800</memorysize>
-        <readbufferfactor>4.0</readbufferfactor>
-    </video>
-    <cache>
-        <!-- Puedes establecer un cachepath externo si lo configuras desde USB -->
-    </cache>
-</advancedsettings>'''
-        
-        message = ('Configuración básica de buffering:\n\n'
-                  '• Buffer de memoria: 50 MB\n'
-                  '• Factor de lectura: 4.0\n'
-                  '• Optimizado para streaming\n\n'
-                  '¿Aplicar configuración básica?')
-        
-        if xbmcgui.Dialog().yesno('Configurar Buffering Básico', message, yeslabel='Aplicar', nolabel='Cancelar'):
-            # Backup automático
-            backup_advancedsettings(config_path)
-            # Asegurar directorio padre
-            parent = os.path.dirname(config_path)
-            try:
-                if parent and not os.path.exists(parent):
-                    os.makedirs(parent, exist_ok=True)
-            except Exception:
-                pass
-            # Intentar escritura estándar, luego fallback a xbmcvfs
-            wrote = False
-            try:
-                with open(config_path, 'w', encoding='utf-8') as f:
-                    f.write(basic_config)
-                wrote = True
-            except Exception as e:
-                log('Fallo escritura estándar: %s' % str(e))
-            if not wrote:
-                try:
-                    fh = xbmcvfs.File(config_path, 'w')
-                    fh.write(basic_config)
-                    fh.close()
-                    wrote = True
-                except Exception as e2:
-                    raise e2
-            
-            xbmcgui.Dialog().ok('Configuración Aplicada', 
-                              'Buffering básico configurado.\n\n'
-                              'Reinicia Kodi para aplicar los cambios.')
-            log('Configuración básica de buffering aplicada')
-        
-    except Exception as e:
-        log('Error configurando buffering básico: %s' % str(e))
-        xbmcgui.Dialog().ok('Error', 'Error configurando buffering: %s' % str(e))
+## configure_basic_buffering ahora proviene de buffering
 
 def configure_advanced_buffering(config_path):
     """Configura buffering avanzado personalizable"""
@@ -1082,6 +954,64 @@ def show_buffering_values(config_path):
     except Exception as e:
         log('Error mostrando valores de buffering: %s' % str(e))
         xbmcgui.Dialog().ok('Error', 'Error mostrando valores: %s' % str(e))
+
+def _autoclean_flag_path():
+    return os.path.join(addon_data_dir, 'usb_autoclean.json')
+
+def get_usb_autoclean_enabled():
+    try:
+        p = _autoclean_flag_path()
+        if os.path.exists(p):
+            with open(p, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            return bool(data.get('enabled', False))
+    except Exception as e:
+        log('No se pudo leer usb_autoclean.json: %s' % str(e))
+    return False
+
+def set_usb_autoclean_enabled(val: bool):
+    try:
+        p = _autoclean_flag_path()
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, 'w', encoding='utf-8') as f:
+            json.dump({'enabled': bool(val)}, f)
+        log('usb_autoclean = %s' % ('ON' if val else 'OFF'))
+    except Exception as e:
+        log('No se pudo escribir usb_autoclean.json: %s' % str(e))
+
+def toggle_usb_autoclean():
+    cur = get_usb_autoclean_enabled()
+    set_usb_autoclean_enabled(not cur)
+    xbmcgui.Dialog().notification(addon_name, 'Auto-limpiar cache USB: %s' % ('ON' if not cur else 'OFF'), time=3000)
+
+def clean_usb_cachepath(config_path):
+    """Limpia el contenido de la carpeta cachepath si existe."""
+    try:
+        dialog = xbmcgui.Dialog()
+        cpath = _read_cachepath_from_config(config_path)
+        if not cpath or not os.path.isdir(cpath):
+            # Fallback: si special://temp está redirigido por symlink, ofrecer limpiar allí
+            temp_root = _special_temp_path()
+            if os.path.islink(temp_root):
+                target_root = os.path.realpath(temp_root)
+                target_cache = os.path.join(target_root, 'cache')
+                use_target = target_cache if os.path.exists(target_cache) else target_root
+                msg = ('No hay cachepath en advancedsettings.xml.\n\n'
+                       'Se detectó redirección de special://temp a:\n%s\n\n'
+                       '¿Limpiar la carpeta de caché en ese destino?') % use_target
+                if dialog.yesno('Cache en USB (temp redirigido)', msg, yeslabel='Limpiar', nolabel='Cancelar'):
+                    removed_count, removed_size = safe_remove_folder_contents(use_target)
+                    dialog.ok('Cache en USB', 'Eliminados %d elementos (%s liberados).' % (removed_count, format_size(removed_size)))
+                    log('Limpieza via temp redirigido: %d, %s' % (removed_count, format_size(removed_size)))
+                return
+            dialog.ok('Cache USB', 'No hay cachepath válido configurado.')
+            return
+        removed_count, removed_size = safe_remove_folder_contents(cpath)
+        xbmcgui.Dialog().ok('Cache USB', 'Eliminados %d elementos (%s liberados).' % (removed_count, format_size(removed_size)))
+        log('Auto-limpieza manual: %d, %s' % (removed_count, format_size(removed_size)))
+    except Exception as e:
+        log('Error limpiando cache USB: %s' % str(e))
+        xbmcgui.Dialog().ok('Error', 'Error limpiando cache USB: %s' % str(e))
 
 def optimize_buffering_auto(config_path):
     """Ajusta buffering según RAM disponible y tipo de almacenamiento"""
@@ -1282,15 +1212,417 @@ def vacuum_databases():
         log('Error compactando bases de datos: %s' % str(e))
         xbmcgui.Dialog().ok('Error', 'Error al compactar: %s' % str(e))
 
+def _read_cachepath_from_config(config_path):
+    try:
+        if not os.path.exists(config_path):
+            return None
+        import xml.etree.ElementTree as ET
+        root = ET.parse(config_path).getroot()
+        el = root.find('cache/cachepath')
+        if el is not None and el.text:
+            path = el.text.strip()
+            return path
+    except Exception as e:
+        log('Error leyendo cachepath: %s' % str(e))
+    return None
+
+def test_usb_cachepath(config_path):
+    """Prueba lectura/escritura en el cachepath configurado (KodiCache en USB)."""
+    try:
+        dialog = xbmcgui.Dialog()
+        cpath = _read_cachepath_from_config(config_path)
+        if not cpath:
+            # Si se usa redirección de temp, sugerir la prueba alternativa
+            temp_root = _special_temp_path()
+            if os.path.islink(temp_root):
+                if dialog.yesno('Sin cachepath (usando temp)',
+                                 'No hay cachepath en advancedsettings.xml, pero special://temp está redirigido.\n\n'
+                                 '¿Quieres probar escritura en special://temp/cache en su lugar?',
+                                 yeslabel='Probar', nolabel='Cancelar'):
+                    test_special_temp_cache_write()
+                return
+            dialog.ok('Prueba de cache', 'No hay cachepath configurado en advancedsettings.xml')
+            return
+        # Crear carpeta si no existe
+        try:
+            os.makedirs(cpath, exist_ok=True)
+        except Exception:
+            pass
+        test_file = os.path.join(cpath, '.cache_test.txt')
+        # Escribir
+        write_ok = False
+        read_ok = False
+        try:
+            with open(test_file, 'w', encoding='utf-8') as f:
+                f.write('kodi-cache-test')
+            write_ok = True
+        except Exception as e:
+            log('Fallo de escritura en cachepath: %s' % str(e))
+        # Leer
+        if write_ok:
+            try:
+                with open(test_file, 'r', encoding='utf-8') as f:
+                    data = f.read().strip()
+                read_ok = (data == 'kodi-cache-test')
+            except Exception as e:
+                log('Fallo de lectura en cachepath: %s' % str(e))
+        # Borrar
+        try:
+            if os.path.exists(test_file):
+                os.remove(test_file)
+        except Exception:
+            pass
+
+        # Espacio libre
+        try:
+            st = os.statvfs(cpath)
+            free = st.f_frsize * st.f_bavail
+            total = st.f_frsize * st.f_blocks
+            free_txt = '%s libres de %s' % (format_size(free), format_size(total))
+        except Exception:
+            free_txt = 'desconocido'
+
+        msg = [
+            'Cache path: %s' % cpath,
+            'Espacio: %s' % free_txt,
+            'Escritura: %s' % ('OK' if write_ok else 'FALLO'),
+            'Lectura: %s' % ('OK' if read_ok else 'FALLO')
+        ]
+        dialog.ok('Prueba de cache USB', '\n'.join(msg))
+    except Exception as e:
+        log('Error en test_usb_cachepath: %s' % str(e))
+        xbmcgui.Dialog().ok('Error', 'Error en prueba de cache: %s' % str(e))
+
+def _special_temp_path():
+    try:
+        p = _translate('special://temp/')
+        # Normalizar para funciones de os.path (quitar barra final)
+        return os.path.normpath(p)
+    except Exception:
+        # Fallback razonable
+        return os.path.expanduser('~/.kodi/temp')
+
+def _temp_symlink_state_path():
+    return os.path.join(addon_data_dir, 'temp_symlink_state.json')
+
+def _is_linux_desktop():
+    try:
+        # Evitar Android
+        if xbmc.getCondVisibility('system.platform.android'):
+            return False
+        return xbmc.getCondVisibility('system.platform.linux')
+    except Exception:
+        return os.name == 'posix'
+
+def _shorten_path(p: str, max_len: int = 28) -> str:
+    try:
+        if len(p) <= max_len:
+            return p
+        return '…' + p[-max_len:]
+    except Exception:
+        return p
+
+def _temp_status_short() -> str:
+    """Devuelve un texto corto con el estado de special://temp (local o enlace y destino)."""
+    try:
+        temp_root = _special_temp_path()
+        if os.path.islink(temp_root):
+            target = os.path.realpath(temp_root)
+            return 'temp: enlace -> %s' % _shorten_path(target)
+        return 'temp: local'
+    except Exception:
+        return 'temp: desconocido'
+
+def view_special_temp_cache():
+    """Muestra información y algunos archivos recientes en special://temp"""
+    try:
+        dialog = xbmcgui.Dialog()
+        temp_root = _special_temp_path()
+        cache_dir = os.path.join(temp_root, 'cache')
+        target = cache_dir if os.path.exists(cache_dir) else temp_root
+
+        total_size = get_folder_size(target)
+        total_files = count_files_in_folder(target)
+
+        # Recopilar últimos archivos modificados
+        recent = []
+        for dirpath, dirnames, filenames in os.walk(target):
+            for fn in filenames:
+                fp = os.path.join(dirpath, fn)
+                try:
+                    st = os.stat(fp)
+                except Exception:
+                    continue
+                recent.append((st.st_mtime, os.path.relpath(fp, target), st.st_size))
+        recent.sort(reverse=True)
+        lines = []
+        lines.append('RUTA DE CACHÉ EN USO (special://temp)')
+        lines.append('')
+        lines.append('Temp real: %s%s' % (temp_root, ' (ENLACE)' if os.path.islink(temp_root) else ''))
+        if os.path.exists(cache_dir):
+            lines.append('Subcarpeta cache: %s' % cache_dir)
+        lines.append('Archivos: %d' % total_files)
+        lines.append('Tamaño total: %s' % format_size(total_size))
+        lines.append('')
+        lines.append('Archivos recientes:')
+        for i, (mt, rel, sz) in enumerate(recent[:50], 1):
+            ts = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(mt))
+            lines.append('%02d) %s  [%s]  %s' % (i, rel, format_size(sz), ts))
+        if total_files == 0:
+            lines.append('(No se encontraron archivos)')
+        dialog.textviewer('Caché actual (special://temp)', '\n'.join(lines))
+    except Exception as e:
+        log('Error en view_special_temp_cache: %s' % str(e))
+        xbmcgui.Dialog().ok('Error', 'No se pudo mostrar la caché: %s' % str(e))
+
+def redirect_temp_cache_to_usb():
+    """Crea un enlace simbólico desde special://temp hacia una carpeta en USB."""
+    try:
+        dialog = xbmcgui.Dialog()
+        if not _is_linux_desktop():
+            dialog.ok('No compatible', 'Esta función requiere Linux (no Android).')
+            return
+
+        temp_root = _special_temp_path()
+        if not temp_root or not os.path.exists(os.path.dirname(temp_root)):
+            dialog.ok('Error', 'No se resolvió la ruta de temp.')
+            return
+
+        # Elegir USB
+        devices = detect_usb_devices()
+        if not devices:
+            from buffering import browse_for_usb_folder
+            sel = browse_for_usb_folder()
+            if sel:
+                devices = [{'name': os.path.basename(sel) or 'USB seleccionado', 'path': sel}]
+        if not devices:
+            dialog.ok('Sin USBs', 'No se detectaron USBs y no se seleccionó carpeta.')
+            return
+        labels = ['%s (%s)' % (d['path'], d.get('free', '')) for d in devices]
+        idx = dialog.select('Selecciona USB para redirigir la caché', labels)
+        if idx == -1:
+            return
+        selected = devices[idx]
+        target_dir = os.path.join(selected['path'], 'KodiTemp')
+        try:
+            os.makedirs(target_dir, exist_ok=True)
+        except Exception as e:
+            dialog.ok('Error', 'No se pudo crear carpeta en USB: %s' % str(e))
+            return
+
+        warn = ('Se redirigirá special://temp a:\n%s\n\n' % target_dir +
+                'Se creará un enlace simbólico en:\n%s\n\n' % temp_root +
+                'Recomendado: no reproduzcas contenido durante el cambio.\n\n' +
+                '¿Continuar?')
+        if not dialog.yesno('Redirigir caché a USB', warn, yeslabel='Continuar', nolabel='Cancelar'):
+            return
+
+        # Preparar temp actual
+        backup_path = None
+        try:
+            if os.path.islink(temp_root):
+                # Quitar enlace previo
+                os.unlink(temp_root)
+            elif os.path.exists(temp_root):
+                if os.listdir(temp_root):
+                    ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+                    backup_path = temp_root + '.bak-' + ts
+                    os.rename(temp_root, backup_path)
+                else:
+                    # Vacía, eliminar
+                    os.rmdir(temp_root)
+        except Exception as e:
+            dialog.ok('Error', 'No se pudo preparar temp: %s' % str(e))
+            return
+
+        # Crear enlace simbólico
+        try:
+            os.symlink(target_dir, temp_root)
+        except Exception as e:
+            # Intentar revertir si creamos backup
+            try:
+                if backup_path and not os.path.exists(temp_root):
+                    os.rename(backup_path, temp_root)
+            except Exception:
+                pass
+            dialog.ok('Error', 'No se pudo crear el enlace simbólico: %s' % str(e))
+            return
+
+        # Verificación rápida de escritura
+        try:
+            test_file = os.path.join(temp_root, '.temp_test')
+            with open(test_file, 'w') as f:
+                f.write('ok')
+            os.remove(test_file)
+            ok = True
+        except Exception:
+            ok = False
+
+        # Guardar estado
+        try:
+            st = {
+                'linked': True,
+                'link': temp_root,
+                'target': target_dir,
+                'backup': backup_path,
+                'created_at': datetime.datetime.now().isoformat()
+            }
+            with open(_temp_symlink_state_path(), 'w', encoding='utf-8') as f:
+                json.dump(st, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+        dialog.ok('Redirección aplicada', 'special://temp -> %s\nEscritura: %s\nReinicia Kodi para asegurar el uso.' % (target_dir, 'OK' if ok else 'FALLO'))
+        log('Temp redirigida a %s (ok=%s)' % (target_dir, ok))
+    except Exception as e:
+        log('Error en redirect_temp_cache_to_usb: %s' % str(e))
+        xbmcgui.Dialog().ok('Error', 'Error redirigiendo cache: %s' % str(e))
+
+def revert_temp_cache_redirection():
+    """Elimina el symlink y restaura temp local."""
+    try:
+        dialog = xbmcgui.Dialog()
+        temp_root = _special_temp_path()
+        state = None
+        try:
+            p = _temp_symlink_state_path()
+            if os.path.exists(p):
+                with open(p, 'r', encoding='utf-8') as f:
+                    state = json.load(f)
+        except Exception:
+            state = None
+
+        if not os.path.islink(temp_root):
+            dialog.ok('Sin enlace', 'La carpeta temp actual no es un enlace simbólico.')
+            return
+
+        if not dialog.yesno('Revertir redirección', 'Se eliminará el enlace y se recreará temp local. ¿Continuar?', yeslabel='Revertir', nolabel='Cancelar'):
+            return
+
+        # Quitar symlink
+        try:
+            os.unlink(temp_root)
+        except Exception as e:
+            dialog.ok('Error', 'No se pudo eliminar el enlace: %s' % str(e))
+            return
+
+        # Restaurar desde backup si existe
+        restored = False
+        backup_path = state.get('backup') if isinstance(state, dict) else None
+        try:
+            if backup_path and os.path.exists(backup_path):
+                os.rename(backup_path, temp_root)
+                restored = True
+            else:
+                os.makedirs(temp_root, exist_ok=True)
+        except Exception as e:
+            dialog.ok('Error', 'No se pudo restaurar temp: %s' % str(e))
+            return
+
+        # Actualizar estado
+        try:
+            with open(_temp_symlink_state_path(), 'w', encoding='utf-8') as f:
+                json.dump({'linked': False, 'link': temp_root, 'restored': restored, 'updated_at': datetime.datetime.now().isoformat()}, f)
+        except Exception:
+            pass
+
+        dialog.ok('Listo', 'Temp local %s.' % ('restaurada desde backup' if restored else 'recreada vacía'))
+        log('Temp revertida; restored=%s' % restored)
+    except Exception as e:
+        log('Error en revert_temp_cache_redirection: %s' % str(e))
+        xbmcgui.Dialog().ok('Error', 'Error revirtiendo redirección: %s' % str(e))
+
+def test_special_temp_cache_write():
+    """Crea la subcarpeta cache y prueba escritura/lectura en special://temp/cache"""
+    try:
+        dialog = xbmcgui.Dialog()
+        temp_root = _special_temp_path()
+        cache_dir = os.path.join(temp_root, 'cache')
+        try:
+            os.makedirs(cache_dir, exist_ok=True)
+        except Exception as e:
+            dialog.ok('Error', 'No se pudo crear cache: %s' % str(e))
+            return
+        # Prueba
+        tf = os.path.join(cache_dir, '.write_test')
+        ok_w = ok_r = False
+        try:
+            with open(tf, 'wb') as f:
+                f.write(b'aspirando-kodi')
+            ok_w = True
+        except Exception as e:
+            log('Fallo escritura temp/cache: %s' % str(e))
+        if ok_w:
+            try:
+                with open(tf, 'rb') as f:
+                    ok_r = (f.read() == b'aspirando-kodi')
+            except Exception as e:
+                log('Fallo lectura temp/cache: %s' % str(e))
+        try:
+            if os.path.exists(tf):
+                os.remove(tf)
+        except Exception:
+            pass
+        # Informe
+        target = os.path.realpath(cache_dir) if os.path.islink(cache_dir) else cache_dir
+        dialog.ok('Prueba special://temp/cache', 'Ruta: %s\nEscritura: %s\nLectura: %s' % (target, 'OK' if ok_w else 'FALLO', 'OK' if ok_r else 'FALLO'))
+    except Exception as e:
+        log('Error en test_special_temp_cache_write: %s' % str(e))
+        xbmcgui.Dialog().ok('Error', 'Error en prueba de temp/cache: %s' % str(e))
+
+def open_timeshift_settings():
+    """Intenta abrir la pantalla de ajustes de Timeshift del PVR."""
+    try:
+        # 1) Si está instalado iptvsimple, abrir directamente sus ajustes
+        try:
+            xbmcaddon.Addon('pvr.iptvsimple')
+            xbmc.executebuiltin('Addon.OpenSettings(pvr.iptvsimple)')
+            # Dar tiempo a que se abra la ventana y no forzar más diálogos
+            xbmc.sleep(800)
+            return
+        except Exception:
+            pass
+
+        # 2) Abrir ajustes de PVR/Timeshift como fallback
+        tried = []
+        def _try(cmd, wait=600):
+            tried.append(cmd)
+            xbmc.executebuiltin(cmd)
+            xbmc.sleep(wait)
+
+        _try('ActivateWindow(pvrsettings)')
+        # Algunos builds aceptan parámetros de categoría en settings
+        _try('ActivateWindow(settings,pvr,return)')
+        _try('ActivateWindow(settings)')
+
+        # 3) Como último recurso, abrir el navegador de addons en clientes PVR
+        _try('ActivateWindow(AddonBrowser,addons://all/pvr/,return)', wait=400)
+
+        # Pequeña ayuda si no se logró abrir directamente
+        msg = (
+            'Si no se abrió directamente Timeshift o el cliente IPTV Simple, ve a:\n'
+            '- Ajustes (modo Experto)\n'
+            '- TV en directo / PVR & Live TV\n'
+            '- Timeshift\n\n'
+            'Para iptvsimple: Ajustes -> Add-ons -> Mis add-ons -> Clientes PVR -> IPTV Simple Client\n\n'
+            'Intentos ejecutados:\n' + '\n'.join(tried)
+        )
+        xbmcgui.Dialog().ok('Ajustes de Timeshift', msg)
+    except Exception as e:
+        log('Error abriendo ajustes de Timeshift: %s' % str(e))
+        xbmcgui.Dialog().ok('Error', 'No se pudieron abrir los ajustes: %s' % str(e))
+
 def perform_speed_test(timeout=15, urls=None):
     """Realiza una descarga corta para estimar velocidad (Mbps)"""
     try:
         # Archivos públicos (fallback si falla el primero)
         urls = urls or [
-            'https://speed.hetzner.de/10MB.bin',  # Alemania (EU)
-            'https://proof.ovh.net/files/10Mio.dat',  # OVH EU
-            'https://download.thinkbroadband.com/10MB.zip',  # UK
-            'https://speedtest.tele2.net/10MB.zip'  # Varios mirrors
+            'https://download.thinkbroadband.com/10MB.zip',  # UK (fiable)
+            'https://speedtest-fra1.digitalocean.com/10mb.test',  # DE (DO FRA1)
+            'https://speedtest-nyc3.digitalocean.com/10mb.test',  # US (DO NYC3)
+            'https://speedtest-sgp1.digitalocean.com/10mb.test',  # SG (DO SGP1)
+            'https://speed.hetzner.de/10MB.bin',  # DE (Hetzner)
+            'https://proof.ovh.net/files/10Mb.dat'  # OVH EU (corrigido)
         ]
         size_bytes = None
         total_read = 0
@@ -1395,10 +1727,12 @@ def speed_test_and_recommend(config_path, urls=None):
 def choose_speed_server():
     """Permite elegir un servidor/ubicación para el test de velocidad"""
     choices = [
-        ('Europa (Hetzner, DE)', 'https://speed.hetzner.de/10MB.bin'),
-        ('Europa (OVH)', 'https://proof.ovh.net/files/10Mio.dat'),
-        ('Europa (UK)', 'https://download.thinkbroadband.com/10MB.zip'),
-        ('Global (Tele2)', 'https://speedtest.tele2.net/10MB.zip')
+        ('Europa (UK - ThinkBroadband)', 'https://download.thinkbroadband.com/10MB.zip'),
+        ('Europa (DE - DO FRA1)', 'https://speedtest-fra1.digitalocean.com/10mb.test'),
+        ('Europa (DE - Hetzner)', 'https://speed.hetzner.de/10MB.bin'),
+        ('Norteamérica (US - DO NYC3)', 'https://speedtest-nyc3.digitalocean.com/10mb.test'),
+        ('Asia (SG - DO SGP1)', 'https://speedtest-sgp1.digitalocean.com/10mb.test'),
+        ('Europa (OVH)', 'https://proof.ovh.net/files/10Mb.dat')
     ]
     labels = [c[0] for c in choices]
     idx = xbmcgui.Dialog().select('Elegir servidor para el test', labels)
@@ -1571,7 +1905,8 @@ def save_buffering_config_to_usb(config_path):
         
         if not usb_devices:
             log('Detección automática falló. Ofreciendo selector manual de carpeta USB')
-            sel = _browse_for_usb_folder()
+            from buffering import browse_for_usb_folder
+            sel = browse_for_usb_folder()
             if sel:
                 # Construir info mínima del USB seleccionado
                 try:
@@ -1688,6 +2023,10 @@ def save_buffering_config_to_usb(config_path):
         <cachemembuffersize>0</cachemembuffersize>
         <readbufferfactor>4.0</readbufferfactor>
     </network>
+    <video>
+        <memorysize>0</memorysize>
+        <readbufferfactor>4.0</readbufferfactor>
+    </video>
     <cache>
         <cachepath>%s</cachepath>
     </cache>
@@ -1760,7 +2099,8 @@ def configure_usb_cachepath(config_path):
         # Detectar USBs o permitir selección manual
         devices = detect_usb_devices()
         if not devices:
-            sel = _browse_for_usb_folder()
+            from buffering import browse_for_usb_folder
+            sel = browse_for_usb_folder()
             if sel:
                 devices = [{'name': os.path.basename(sel) or 'USB seleccionado', 'path': sel}]
         if not devices:
@@ -1783,6 +2123,10 @@ def configure_usb_cachepath(config_path):
         <cachemembuffersize>0</cachemembuffersize>
         <readbufferfactor>4.0</readbufferfactor>
     </network>
+    <video>
+        <memorysize>0</memorysize>
+        <readbufferfactor>4.0</readbufferfactor>
+    </video>
     <cache>
         <cachepath>%s</cachepath>
     </cache>
@@ -1891,6 +2235,8 @@ def main():
             # Mostrar menú principal
             dialog = xbmcgui.Dialog()
             
+            # Indicador de estado de temp al final del título de menú
+            temp_hint = _temp_status_short()
             opciones = [
                 'Limpiar Caché',
                 'Limpiar Thumbnails', 
@@ -1899,7 +2245,7 @@ def main():
                 'Limpieza Completa',
                 'Compactar Bases de Datos',
                 'Programar limpieza al iniciar',
-                'Gestión de Buffering',
+                'Gestión de Buffering (%s)' % temp_hint,
                 'Reiniciar Kodi',
                 'Acerca de',
                 'Salir'
