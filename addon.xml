@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<addon id="script.aspirando-kodi" name="Aspirando Kodi" version="1.0.6" provider-name="entreunosyceros">
+    <requires>
+        <import addon="xbmc.python" version="3.0.0"/>
+    </requires>
+    <extension point="xbmc.python.script" library="default.py">
+        <provides>executable</provides>
+    </extension>
+    <extension point="xbmc.service" library="service.py" start="startup" />
+    <extension point="xbmc.addon.metadata">
+        <platform>all</platform>
+    <summary>Limpiador y optimizador para Kodi: caché, thumbnails, paquetes, temporales, buffering y más</summary>
+    <description>Aspirando Kodi es una herramienta completa para mantener tu Kodi ágil y optimizado.
+
+Funciones principales:
+- Limpieza selectiva y completa: caché, thumbnails, paquetes y temporales
+- Gestión de buffering: modos básico/avanzado, optimización automática según tu equipo
+- Visualiza y gestiona advancedsettings.xml: ver valores, crear/guardar/eliminar configuración
+- Copias de seguridad y restauración de advancedsettings.xml con un clic
+- Guardar configuración de buffering en USB para usarla en otros equipos
+- Programar una limpieza completa al iniciar Kodi (incluye aviso antes de ejecutar)
+- Compactar bases de datos (Textures, Addons, MyVideos) para mejorar rendimiento
+- Diagnóstico de dispositivos USB accesibles desde Kodi
+- Información del addon y acceso rápido al repositorio
+
+Incluye un pequeño servicio que, si está programado, ejecuta la limpieza al arrancar Kodi mostrando un resumen previo.
+
+Recomendación: tras cambiar la configuración de buffering, reinicia Kodi para aplicar los cambios.</description>
+    <news>v1.0.6
+- Test de velocidad con elección de servidor
+- Modo streaming basado en bitrate (preserva cachepath si existe)
+
+v1.0.5
+- Test de velocidad con recomendación automática de buffering
+
+v1.0.4
+- Icono principal corregido (icon.png en metadata y paquete)
+
+v1.0.3
+- Copias de seguridad y restauración de advancedsettings.xml
+- Optimización automática de buffering
+- Compactación de bases de datos de Kodi
+
+v1.0.2
+- Ver valores de advancedsettings.xml (parseo y vista legible)
+
+v1.0.1
+- Servicio de inicio para limpieza programada con aviso previo
+
+v1.0.0
+- Limpieza de caché, thumbnails, paquetes y temporales; gestión básica/avanzada de buffering</news>
+        <assets>
+            <icon>icon.png</icon>
+            <fanart>fanart.png</fanart>
+        </assets>
+    </extension>
+</addon>
