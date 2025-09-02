@@ -1,5 +1,7 @@
 # Aspirando Kodi (script.aspirando-kodi)
 
+<img width="1024" height="1024" alt="icono" src="https://github.com/user-attachments/assets/3321db4d-e6e0-4619-9027-7db537574499" />
+
 Herramienta de limpieza y optimización para Kodi: caché, thumbnails, paquetes, temporales, buffering y más. Incluye pruebas de velocidad, backups de configuración y un servicio opcional para limpieza automática al iniciar Kodi.
 
 ## Requisitos
