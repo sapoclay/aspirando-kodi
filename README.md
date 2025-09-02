@@ -7,6 +7,7 @@ Herramienta de limpieza y optimización para Kodi: caché, thumbnails, paquetes,
 ## Requisitos
 - Kodi 19 o superior (Python 3). El addon requiere `xbmc.python` 3.0.0.
 - Sistema con permisos para leer/escribir en `~/.kodi/userdata/`.
+- Nota de plataforma: en Linux (incluye LibreELEC/CoreELEC) todas las funciones están disponibles. En Android algunas funciones (como redirigir `special://temp` mediante symlink) no están soportadas por el sistema; ver sección "Compatibilidad".
 
 ## Instalación
 - Desde Kodi: Add-ons > Instalar desde un archivo .zip > seleccionar `script.aspirando-kodi.zip`.
@@ -24,7 +25,8 @@ Nota sobre el zip: el primer elemento del zip debe ser la carpeta `script.aspira
   - Limpieza Completa (todo lo anterior con resumen previo).
   - Compactar Bases de Datos (Textures, Addons, MyVideos).
   - Programar limpieza al iniciar (ejecución automática en el próximo arranque con aviso previo).
-  - Gestión de Buffering (submenú).
+  - Gestión de Buffering (submenú agrupado por funcionalidades).
+  - Ajustes rápidos: acceso directo a “PVR IPTV Simple Client” (pantalla de Timeshift).
   - Reiniciar Kodi y Acerca de.
 
 ## Gestión de Buffering (submenú)
@@ -41,11 +43,18 @@ Nota sobre el zip: el primer elemento del zip debe ser la carpeta `script.aspira
 - Eliminar configuración de buffering: borra `advancedsettings.xml` (Kodi vuelve a valores por defecto).
 - Diagnóstico USB: muestra dispositivos montados y estado de escritura.
 - Test de velocidad y recomendación: descarga breve y propone buffer/factor según Mbps.
-- Test de velocidad (elegir servidor): permite seleccionar el servidor del test.
+- Test de velocidad (elegir servidor): permite seleccionar el servidor del test (ThinkBroadband / DigitalOcean / Hetzner / OVH).
 - Modo streaming (ajuste por bitrate): elige el bitrate objetivo (SD/HD/FullHD/4K) y aplica valores; si ya existe `cachepath`, se preserva y se prioriza disco (buffer en RAM a 0).
 - Optimización automática: ajusta según RAM disponible y heurísticas del sistema.
 
 Tras aplicar cambios de buffering, reiniciar Kodi para asegurar que se apliquen.
+
+## Special://temp y caché temporal
+- Visor de `special://temp` y `special://cache`: lista contenidos y permite pruebas de escritura/limpieza.
+- Redirección de `special://temp` a USB mediante enlace simbólico (solo Linux):
+  - Crea un symlink desde la carpeta temporal de Kodi hacia un directorio del USB para que los temporales de streaming/pistas se escriban en el USB.
+  - Incluye opciones de estado y "Revertir redirección" para volver al estado original.
+- En Android no es posible crear esta redirección por restricciones del sistema (SELinux/almacenamiento con ámbito). Ver alternativas en la sección de Compatibilidad.
 
 ## Rutas importantes
 - Configuración global de buffering: `~/.kodi/userdata/advancedsettings.xml`
@@ -64,11 +73,19 @@ Tras aplicar cambios de buffering, reiniciar Kodi para asegurar que se apliquen.
 - Cambios de buffering no surten efecto: reiniciar Kodi después de aplicar ajustes; comprobar que `advancedsettings.xml` existe y no tiene errores.
 - El USB debe permanecer montado en la misma ruta. Si cambia la ruta de montaje, reconfigura el cachepath.
 
+## Compatibilidad
+- Linux (PC, LibreELEC/CoreELEC): soporte completo, incluida la redirección de `special://temp` a USB mediante symlink.
+- Android (TV/Box/Tablet):
+  - Funciones soportadas: limpieza (caché, thumbnails, paquetes, temporales), compactación de BBDD, tests de velocidad, configuración de buffering en `advancedsettings.xml`, diagnósticos básicos y atajo a IPTV Simple.
+  - Funciones limitadas/no soportadas: redirección de `special://temp` por symlink (no permitida), acceso directo a ciertas rutas de USB sin SAF, y algunas detecciones automáticas de montajes.
+  - Recomendaciones: usar el selector de carpeta del addon para elegir rutas dentro del espacio accesible de Kodi; mantener `cachemembuffersize` > 0 si no se dispone de ruta externa fiable; considerar tarjetas SD/USB que aparezcan en `/storage` con permisos de escritura para Kodi.
+
 ## Privacidad y seguridad
 - El addon no envía datos a terceros. El test de velocidad descarga archivos públicos (sin datos personales) para estimar Mbps.
 - Las rutas de usuario se manejan dentro del perfil de Kodi.
 
 ## Registro de cambios (destacado)
+- v1.0.14: Modularización (se extrae `buffering.py`), menú de buffering agrupado, visor/pruebas de `special://temp` y `special://cache`, redirección de `special://temp` a USB (Linux) con revertir, atajo a ajustes de Timeshift (PVR IPTV Simple), servidores de test de velocidad actualizados.
 - v1.0.7: Opción “Configurar USB como cache (directo)” y muestra de `cachepath` con espacio libre en “Ver valores…”.
 - v1.0.6: Test de velocidad con elección de servidor; modo streaming por bitrate (preserva cachepath si existe).
 - v1.0.5: Test de velocidad con recomendación automática de buffering.
@@ -78,3 +95,10 @@ Tras aplicar cambios de buffering, reiniciar Kodi para asegurar que se apliquen.
 ## Créditos
 - Autor: entreunosyceros
 - Repositorio: https://github.com/sapoclay/aspirando-kodi
+
+---
+
+Hoja de ruta (Android específico)
+- Edición Android del addon con detecciones de ruta para `/storage/*` y `/mnt/media_rw/*`, pruebas R/W vía `xbmcvfs`, y selector de carpeta adaptado a SAF.
+- Deshabilitar/ocultar en Android la redirección por symlink y ofrecer alternativas seguras (p. ej., limpieza y diagnóstico avanzado de temporales; uso de `cachemembuffersize=0` únicamente cuando la ruta externa sea 100% escribible y persistente).
+- Documentación ampliada con pasos para seleccionar almacenamiento externo dentro de Kodi y recomendaciones por versión de Android.

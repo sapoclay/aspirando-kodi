@@ -597,6 +597,7 @@ def manage_buffering():
             current_config = "Configurado" if os.path.exists(advancedsettings_path) else "No configurado"
             auto_clean = 'ON' if get_usb_autoclean_enabled() else 'OFF'
             temp_hint = _temp_status_short()
+            is_android = xbmc.getCondVisibility('system.platform.android')
 
             # Submenús como funciones internas para claridad
             def submenu_estado():
@@ -748,38 +749,28 @@ def manage_buffering():
                     elif i == 2:
                         remove_buffering_config(advancedsettings_path)
 
-            # Menú principal de gestión de buffering (agrupado)
-            categorias = [
-                'Estado y visualización (%s)' % temp_hint,
-                'Configuración de buffering (%s)' % current_config,
-                'Cache en USB (AutoClean: %s)' % auto_clean,
-                'Velocidad y diagnóstico',
-                'Redirección de temp a USB',
-                'PVR / Timeshift',
-                'Copias de seguridad',
-                'Volver'
-            ]
+            # Menú principal de gestión de buffering (agrupado, dinámico)
+            categorias = []
+            handlers = []
+            categorias.append('Estado y visualización (%s)' % temp_hint); handlers.append(submenu_estado)
+            categorias.append('Configuración de buffering (%s)' % current_config); handlers.append(submenu_config)
+            categorias.append('Cache en USB (AutoClean: %s)' % auto_clean); handlers.append(submenu_usb)
+            categorias.append('Velocidad y diagnóstico'); handlers.append(submenu_speed_diag)
+            if not is_android:
+                categorias.append('Redirección de temp a USB'); handlers.append(submenu_temp_redirect)
+            categorias.append('PVR / Timeshift'); handlers.append(submenu_timeshift)
+            categorias.append('Copias de seguridad'); handlers.append(submenu_backups)
+            categorias.append('Volver'); handlers.append(None)
 
             seleccion = dialog.select('Gestión de Buffering', categorias)
 
-            if seleccion in (-1, len(categorias)-1):
+            if seleccion == -1 or seleccion == len(categorias) - 1:
                 log('Usuario salió de gestión de buffering (agrupado)')
                 break
 
-            if seleccion == 0:
-                submenu_estado()
-            elif seleccion == 1:
-                submenu_config()
-            elif seleccion == 2:
-                submenu_usb()
-            elif seleccion == 3:
-                submenu_speed_diag()
-            elif seleccion == 4:
-                submenu_temp_redirect()
-            elif seleccion == 5:
-                submenu_timeshift()
-            elif seleccion == 6:
-                submenu_backups()
+            handler = handlers[seleccion]
+            if callable(handler):
+                handler()
             
     except Exception as e:
         log('Error gestionando buffering: %s' % str(e))
