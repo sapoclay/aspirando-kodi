@@ -286,6 +286,26 @@ def detect_usb_devices():
     
     return usb_devices
 
+def _browse_for_usb_folder():
+    """Permite al usuario elegir manualmente una carpeta (USB) cuando la detección falla."""
+    try:
+        dialog = xbmcgui.Dialog()
+        # Intentar diálogo de exploración de carpetas
+        try:
+            # En Kodi, browse para carpetas suele ser type=3
+            path = dialog.browse(3, 'Selecciona carpeta en tu USB', 'files', '', False, True, '/media')
+        except Exception:
+            path = ''
+        if path and isinstance(path, str) and os.path.isdir(path):
+            return path
+        # Fallback: pedir ruta manualmente
+        path = dialog.input('Introduce ruta del USB (p. ej. /media/USUARIO/NOMBRE)', type=xbmcgui.INPUT_ALPHANUM)
+        if path and os.path.isdir(path):
+            return path
+    except Exception as e:
+        log('Error en _browse_for_usb_folder: %s' % str(e))
+    return None
+
 def get_usb_info(path, name):
     """Obtiene información de un dispositivo USB de forma segura"""
     try:
@@ -723,6 +743,7 @@ def manage_buffering():
                 'Configurar buffering básico',
                 'Configurar buffering avanzado',
                 'Guardar configuración en USB',
+                'Configurar USB como cache (directo)',
                 'Crear copia de seguridad',
                 'Restaurar copia de seguridad',
                 'Eliminar configuración de buffering',
@@ -737,7 +758,7 @@ def manage_buffering():
             seleccion = dialog.select('Gestión de Buffering (%s)' % current_config, opciones)
             
             # Usuario canceló o seleccionó volver
-            if seleccion == -1 or seleccion == 13:
+            if seleccion == -1 or seleccion == len(opciones) - 1:
                 log('Usuario salió de gestión de buffering')
                 break
             
@@ -752,29 +773,32 @@ def manage_buffering():
                 configure_advanced_buffering(advancedsettings_path)
             elif seleccion == 4:  # Guardar en USB
                 save_buffering_config_to_usb(advancedsettings_path)
-            elif seleccion == 5:  # Crear backup
+            elif seleccion == 5:  # Configurar USB como cache (directo)
+                log('Usuario seleccionó: Configurar USB como cache (directo)')
+                configure_usb_cachepath(advancedsettings_path)
+            elif seleccion == 6:  # Crear backup
                 log('Usuario seleccionó: Crear copia de seguridad')
                 backup_advancedsettings(advancedsettings_path, manual=True)
-            elif seleccion == 6:  # Restaurar backup
+            elif seleccion == 7:  # Restaurar backup
                 log('Usuario seleccionó: Restaurar copia de seguridad')
                 restore_advancedsettings_interactive(advancedsettings_path)
-            elif seleccion == 7:  # Eliminar configuración
+            elif seleccion == 8:  # Eliminar configuración
                 remove_buffering_config(advancedsettings_path)
-            elif seleccion == 8:  # Diagnóstico USB
+            elif seleccion == 9:  # Diagnóstico USB
                 log('Usuario seleccionó: Diagnóstico USB (desde Gestión de Buffering)')
                 show_usb_diagnostic()
-            elif seleccion == 9:  # Test de velocidad y recomendación
+            elif seleccion == 10:  # Test de velocidad y recomendación
                 log('Usuario seleccionó: Test de velocidad y recomendación')
                 speed_test_and_recommend(advancedsettings_path)
-            elif seleccion == 10:  # Test de velocidad (elegir servidor)
+            elif seleccion == 11:  # Test de velocidad (elegir servidor)
                 log('Usuario seleccionó: Test con servidor elegido')
                 urls = choose_speed_server()
                 if urls:
                     speed_test_and_recommend(advancedsettings_path, urls)
-            elif seleccion == 11:  # Modo streaming (bitrate)
+            elif seleccion == 12:  # Modo streaming (bitrate)
                 log('Usuario seleccionó: Modo streaming (bitrate)')
                 streaming_mode_adjust(advancedsettings_path)
-            elif seleccion == 12:  # Optimización automática
+            elif seleccion == 13:  # Optimización automática
                 log('Usuario seleccionó: Optimización automática de buffering')
                 optimize_buffering_auto(advancedsettings_path)
             
@@ -1019,6 +1043,23 @@ def parse_advancedsettings_values(config_path):
                 result['Video memory size'] = memorysize
         if readfactor_v is not None:
             result['Read buffer factor (video)'] = readfactor_v
+
+        # cachepath
+        try:
+            el = root.find('cache/cachepath')
+            if el is not None and el.text:
+                cpath = el.text.strip()
+                result['Cache path'] = cpath
+                try:
+                    if os.path.exists(cpath):
+                        st = os.statvfs(cpath)
+                        free = st.f_frsize * st.f_bavail
+                        total = st.f_frsize * st.f_blocks
+                        result['Cache free space'] = '%s libres de %s' % (format_size(free), format_size(total))
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
         if not result:
             result['Info'] = 'No se encontraron valores de buffering específicos.'
@@ -1529,15 +1570,32 @@ def save_buffering_config_to_usb(config_path):
         usb_devices = detect_usb_devices()
         
         if not usb_devices:
-            log('No se encontraron dispositivos USB')
-            dialog.ok('Sin USBs Detectados',
-                     'No se detectaron dispositivos USB\n'
-                     'conectados y accesibles.\n\n'
-                     'Asegúrate de que:\n'
-                     '• El USB esté conectado\n'
-                     '• El USB esté montado\n'
-                     '• Tengas permisos de escritura')
-            return
+            log('Detección automática falló. Ofreciendo selector manual de carpeta USB')
+            sel = _browse_for_usb_folder()
+            if sel:
+                # Construir info mínima del USB seleccionado
+                try:
+                    stat = os.statvfs(sel)
+                    total_space = stat.f_frsize * stat.f_blocks
+                    free_space = stat.f_frsize * stat.f_bavail
+                    usb_devices = [{
+                        'name': os.path.basename(sel) or 'USB seleccionado',
+                        'path': sel,
+                        'size': format_size(total_space),
+                        'free': format_size(free_space),
+                        'device': os.path.basename(sel),
+                        'total_bytes': total_space,
+                        'free_bytes': free_space
+                    }]
+                    log('USB establecido manualmente: %s' % sel)
+                except Exception as e:
+                    log('No se pudo obtener info del USB seleccionado: %s' % str(e))
+                    usb_devices = [{'name': 'USB seleccionado', 'path': sel}]
+            else:
+                dialog.ok('Sin USBs',
+                          'No se detectaron USBs y no se seleccionó carpeta.\n'
+                          'Comprueba el montaje o introduce la ruta manualmente.')
+                return
         
         # Mostrar lista de USBs disponibles
         usb_options = []
@@ -1694,6 +1752,62 @@ def remove_buffering_config(config_path):
     except Exception as e:
         log('Error eliminando configuración: %s' % str(e))
         xbmcgui.Dialog().ok('Error', 'Error eliminando configuración: %s' % str(e))
+
+def configure_usb_cachepath(config_path):
+    """Configura directamente un USB como cachepath (buffermode=2, cachemembuffersize=0)."""
+    try:
+        dialog = xbmcgui.Dialog()
+        # Detectar USBs o permitir selección manual
+        devices = detect_usb_devices()
+        if not devices:
+            sel = _browse_for_usb_folder()
+            if sel:
+                devices = [{'name': os.path.basename(sel) or 'USB seleccionado', 'path': sel}]
+        if not devices:
+            dialog.ok('Sin USBs', 'No se detectaron USBs y no se seleccionó carpeta.')
+            return
+        labels = ['%s (%s)' % (d['path'], d.get('free', '')) for d in devices]
+        idx = dialog.select('Selecciona USB para cache', labels)
+        if idx == -1:
+            return
+        selected = devices[idx]
+        cache_dir = os.path.join(selected['path'], 'KodiCache')
+        try:
+            os.makedirs(cache_dir, exist_ok=True)
+        except Exception:
+            pass
+
+        config = '''<advancedsettings>
+    <network>
+        <buffermode>2</buffermode>
+        <cachemembuffersize>0</cachemembuffersize>
+        <readbufferfactor>4.0</readbufferfactor>
+    </network>
+    <cache>
+        <cachepath>%s</cachepath>
+    </cache>
+</advancedsettings>''' % cache_dir
+
+        # Backup y escritura
+        backup_advancedsettings(config_path)
+        parent = os.path.dirname(config_path)
+        try:
+            if parent and not os.path.exists(parent):
+                os.makedirs(parent, exist_ok=True)
+        except Exception:
+            pass
+        try:
+            with open(config_path, 'w', encoding='utf-8') as f:
+                f.write(config)
+        except Exception:
+            fh = xbmcvfs.File(config_path, 'w')
+            fh.write(config)
+            fh.close()
+        dialog.ok('Cache en USB configurada', 'cachepath: %s\nReinicia Kodi para aplicar.' % cache_dir)
+        log('cachepath configurado en: %s' % cache_dir)
+    except Exception as e:
+        log('Error configurando USB como cache: %s' % str(e))
+        xbmcgui.Dialog().ok('Error', 'Error configurando cache en USB: %s' % str(e))
 
 def show_about():
     """Muestra ventana Acerca de con logo usando notificación + textviewer"""

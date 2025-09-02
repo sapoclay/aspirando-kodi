@@ -30,10 +30,13 @@ Nota sobre el zip: el primer elemento del zip debe ser la carpeta `script.aspira
 ## Gestión de Buffering (submenú)
 - Ver configuración actual: muestra `advancedsettings.xml` (si existe) o los valores por defecto.
 - Ver valores de advancedsettings.xml: lectura amigable de parámetros clave.
+  - Muestra `Cache path` si está activo y el espacio libre del USB (libre/total).
 - Configurar buffering básico: valores recomendados estándar (50 MB, factor 4.0).
 - Configurar buffering avanzado: eliges tamaño de buffer y factor de lectura.
 - Guardar configuración en USB: copia el `advancedsettings.xml` al USB (carpeta `KodiConfig/`).
   - Opción para configurar el USB como cache externo (cachepath) y `buffermode=2`.
+- Configurar USB como cache (directo): selecciona un USB y crea `KodiCache` como destino de cache.
+  - Aplica `buffermode=2`, `cachemembuffersize=0` y establece `cachepath` al USB.
 - Crear/Restaurar copia de seguridad: backups automáticos en el directorio de datos del addon.
 - Eliminar configuración de buffering: borra `advancedsettings.xml` (Kodi vuelve a valores por defecto).
 - Diagnóstico USB: muestra dispositivos montados y estado de escritura.
@@ -59,12 +62,14 @@ Tras aplicar cambios de buffering, reiniciar Kodi para asegurar que se apliquen.
 - Instalación manual: copiar la carpeta `script.aspirando-kodi/` a `~/.kodi/addons/` y reiniciar.
 - USB no aparece o no guarda: verificar que el dispositivo esté montado en `/media`, `/mnt` o `/run/media` y que tenga permisos de escritura. Formatos soportados típicos: vfat, ntfs, exfat, ext*.
 - Cambios de buffering no surten efecto: reiniciar Kodi después de aplicar ajustes; comprobar que `advancedsettings.xml` existe y no tiene errores.
+- El USB debe permanecer montado en la misma ruta. Si cambia la ruta de montaje, reconfigura el cachepath.
 
 ## Privacidad y seguridad
 - El addon no envía datos a terceros. El test de velocidad descarga archivos públicos (sin datos personales) para estimar Mbps.
 - Las rutas de usuario se manejan dentro del perfil de Kodi.
 
 ## Registro de cambios (destacado)
+- v1.0.7: Opción “Configurar USB como cache (directo)” y muestra de `cachepath` con espacio libre en “Ver valores…”.
 - v1.0.6: Test de velocidad con elección de servidor; modo streaming por bitrate (preserva cachepath si existe).
 - v1.0.5: Test de velocidad con recomendación automática de buffering.
 - v1.0.4: Icono principal corregido.
