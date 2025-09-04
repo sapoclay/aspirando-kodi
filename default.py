@@ -520,7 +520,7 @@ def clean_all():
         xbmcgui.Dialog().ok('Error', 'Error en limpieza completa: %s' % str(e))
 
 def schedule_clean_on_start():
-    """Muestra un resumen y programa una limpieza completa al iniciar Kodi"""
+    """Programa limpieza al inicio: una vez o en cada inicio; también permite desactivar."""
     try:
         log('Preparando programación de limpieza al iniciar')
         # Obtener información actual
@@ -532,20 +532,30 @@ def schedule_clean_on_start():
         total_size = cache_size + thumb_size + pack_size + temp_size
         total_files = cache_files + thumb_files + pack_files + temp_files
 
+        dialog = xbmcgui.Dialog()
+        # Opción para desactivar incluso si no hay nada que limpiar ahora
         if total_size == 0:
-            xbmcgui.Dialog().ok('Sin limpieza necesaria', 'No hay archivos para limpiar. No se programó ninguna acción.')
+            choice = dialog.select('Limpieza al inicio', [
+                'Desactivar limpieza al iniciar',
+                'Cancelar'
+            ])
+            if choice == 0:
+                try:
+                    os.remove(os.path.join(addon_data_dir, 'schedule_clean.json'))
+                except Exception:
+                    pass
+                dialog.ok('Limpieza al inicio', 'Limpieza programada desactivada.')
             return
 
-        # Resumen para mostrar al usuario
+        # Resumen y opciones de programación
         summary = (
-            'Se programará una limpieza completa al iniciar Kodi.\n\n'
-            'Se eliminarán:\n'
+            'Resumen estimado:\n\n'
             '- Caché: %d archivos (%s)\n'
             '- Thumbnails: %d archivos (%s)\n'
             '- Paquetes: %d archivos (%s)\n'
             '- Temporales: %d archivos (%s)\n\n'
             'TOTAL: %d archivos (%s)\n\n'
-            '¿Deseas programar esta limpieza para el próximo inicio?'
+            'Elige el modo:'
         ) % (
             cache_files, format_size(cache_size),
             thumb_files, format_size(thumb_size),
@@ -553,16 +563,28 @@ def schedule_clean_on_start():
             temp_files, format_size(temp_size),
             total_files, format_size(total_size)
         )
-
-        dialog = xbmcgui.Dialog()
-        if not dialog.yesno('Programar limpieza al iniciar', summary, yeslabel='Programar', nolabel='Cancelar'):
-            log('Usuario canceló la programación de limpieza')
+        choice = dialog.select('Programar limpieza al iniciar', [
+            'Ejecutar en el próximo inicio (una vez)',
+            'Ejecutar en cada inicio (persistente)',
+            'Desactivar limpieza al iniciar',
+            'Cancelar'
+        ], useDetails=True)
+        if choice in (-1, 3):
+            log('Usuario canceló programación')
+            return
+        if choice == 2:
+            try:
+                os.remove(os.path.join(addon_data_dir, 'schedule_clean.json'))
+            except Exception:
+                pass
+            dialog.ok('Limpieza al inicio', 'Limpieza programada desactivada.')
             return
 
         # Guardar marca en addon_data_dir
         schedule_path = os.path.join(addon_data_dir, 'schedule_clean.json')
         data = {
             'scheduled': True,
+            'repeat': (choice == 1),
             'created': __import__('datetime').datetime.now().isoformat(),
             'planned': {
                 'cache': {'files': cache_files, 'size': cache_size},
@@ -570,13 +592,15 @@ def schedule_clean_on_start():
                 'packages': {'files': pack_files, 'size': pack_size},
                 'temp': {'files': temp_files, 'size': temp_size},
                 'total': {'files': total_files, 'size': total_size}
-            }
+            },
+            'summary': summary
         }
         try:
+            os.makedirs(addon_data_dir, exist_ok=True)
             with open(schedule_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-            log('Limpieza programada. Archivo: %s' % schedule_path)
-            dialog.ok('Limpieza programada', 'Se ejecutará una limpieza completa al iniciar Kodi.')
+            log('Limpieza programada (%s). Archivo: %s' % ('persistente' if data['repeat'] else 'una vez', schedule_path))
+            dialog.ok('Limpieza programada', 'Se ejecutará %s.' % ('en cada inicio' if data['repeat'] else 'en el próximo inicio'))
         except Exception as e:
             log('No se pudo programar la limpieza: %s' % str(e))
             dialog.ok('Error', 'No se pudo programar la limpieza: %s' % str(e))
@@ -975,15 +999,18 @@ def toggle_usb_autoclean():
     set_usb_autoclean_enabled(not cur)
     xbmcgui.Dialog().notification(addon_name, 'Auto-limpiar cache USB: %s' % ('ON' if not cur else 'OFF'), time=3000)
 
-def clean_usb_cachepath(config_path):
-    """Limpia el contenido de la carpeta cachepath si existe."""
+def clean_usb_cachepath(config_path, silent=False):
+    """Limpia el contenido de la carpeta cachepath si existe.
+
+    silent=True evita mostrar diálogos intrusivos (usado por la auto-limpieza al parar reproducción).
+    """
     try:
         dialog = xbmcgui.Dialog()
         cpath = _read_cachepath_from_config(config_path)
         if not cpath or not os.path.isdir(cpath):
-            # Fallback: si special://temp está redirigido por symlink, ofrecer limpiar allí
+            # Fallback: si special://temp está redirigido por symlink, ofrecer limpiar allí (solo si no es silencioso)
             temp_root = _special_temp_path()
-            if os.path.islink(temp_root):
+            if not silent and os.path.islink(temp_root):
                 target_root = os.path.realpath(temp_root)
                 target_cache = os.path.join(target_root, 'cache')
                 use_target = target_cache if os.path.exists(target_cache) else target_root
@@ -994,15 +1021,18 @@ def clean_usb_cachepath(config_path):
                     removed_count, removed_size = safe_remove_folder_contents(use_target)
                     dialog.ok('Cache en USB', 'Eliminados %d elementos (%s liberados).' % (removed_count, format_size(removed_size)))
                     log('Limpieza via temp redirigido: %d, %s' % (removed_count, format_size(removed_size)))
-                return
-            dialog.ok('Cache USB', 'No hay cachepath válido configurado.')
+            else:
+                # En modo silencioso o sin redirección: no molestar al usuario
+                log('Auto-limpieza: sin cachepath válido; se omite (silent=%s)' % silent)
             return
         removed_count, removed_size = safe_remove_folder_contents(cpath)
-        xbmcgui.Dialog().ok('Cache USB', 'Eliminados %d elementos (%s liberados).' % (removed_count, format_size(removed_size)))
-        log('Auto-limpieza manual: %d, %s' % (removed_count, format_size(removed_size)))
+        if not silent:
+            xbmcgui.Dialog().ok('Cache USB', 'Eliminados %d elementos (%s liberados).' % (removed_count, format_size(removed_size)))
+        log('Limpieza cache USB: %d, %s (silent=%s)' % (removed_count, format_size(removed_size)), )
     except Exception as e:
         log('Error limpiando cache USB: %s' % str(e))
-        xbmcgui.Dialog().ok('Error', 'Error limpiando cache USB: %s' % str(e))
+        if not silent:
+            xbmcgui.Dialog().ok('Error', 'Error limpiando cache USB: %s' % str(e))
 
 def optimize_buffering_auto(config_path):
     """Ajusta buffering según RAM disponible y tipo de almacenamiento"""
@@ -1562,46 +1592,80 @@ def test_special_temp_cache_write():
         xbmcgui.Dialog().ok('Error', 'Error en prueba de temp/cache: %s' % str(e))
 
 def open_timeshift_settings():
-    """Intenta abrir la pantalla de ajustes de Timeshift del PVR."""
+    """Abre los ajustes de IPTV Simple (pvr.iptvsimple) con tratamiento especial en Android.
+
+    - Android: intenta instalar/habilitar el addon si falta y reintenta abrir ajustes.
+    - Otros: abre directamente los ajustes si está instalado; si no, abre Ajustes PVR.
+    """
     try:
-        # 1) Si está instalado iptvsimple, abrir directamente sus ajustes
-        try:
-            xbmcaddon.Addon('pvr.iptvsimple')
-            xbmc.executebuiltin('Addon.OpenSettings(pvr.iptvsimple)')
-            # Dar tiempo a que se abra la ventana y no forzar más diálogos
-            xbmc.sleep(800)
+        dialog = xbmcgui.Dialog()
+        is_android = xbmc.getCondVisibility('system.platform.android')
+
+        def _has_addon(addon_id: str) -> bool:
+            try:
+                xbmcaddon.Addon(addon_id)
+                return True
+            except Exception:
+                return False
+
+        def _open_settings_retry(addon_id: str, attempts: int = 2, delay_ms: int = 1000):
+            # Cierra diálogos para evitar que la ventana se cierre de inmediato
+            xbmc.executebuiltin('Dialog.Close(all)')
+            xbmc.sleep(300)
+            for _ in range(attempts):
+                xbmc.executebuiltin('Addon.OpenSettings(%s)' % addon_id)
+                xbmc.sleep(delay_ms)
+
+        # Flujo Android: instalar/habilitar y abrir
+        if is_android:
+            if not _has_addon('pvr.iptvsimple'):
+                if dialog.yesno('IPTV Simple',
+                                 'El cliente PVR IPTV Simple no está instalado.\n\n'
+                                 '¿Deseas instalarlo ahora?',
+                                 yeslabel='Instalar', nolabel='Cancelar'):
+                    try:
+                        xbmc.executebuiltin('InstallAddon(pvr.iptvsimple)')
+                        # Esperar a instalación (hasta ~15s)
+                        for _ in range(30):
+                            xbmc.sleep(500)
+                            if _has_addon('pvr.iptvsimple'):
+                                break
+                    except Exception:
+                        pass
+                # Si sigue sin estar, abrir el buscador como ayuda
+                if not _has_addon('pvr.iptvsimple'):
+                    xbmc.executebuiltin('ActivateWindow(addonbrowser,addons://search/pvr.iptvsimple/,return)')
+                    dialog.notification('IPTV Simple', 'Instala y habilita PVR IPTV Simple', time=4000)
+                    return
+
+            # Intentar habilitar (si estuviera deshabilitado)
+            try:
+                xbmc.executebuiltin('EnableAddon(pvr.iptvsimple)')
+                xbmc.sleep(400)
+            except Exception:
+                pass
+
+            _open_settings_retry('pvr.iptvsimple', attempts=2, delay_ms=1200)
             return
-        except Exception:
-            pass
 
-        # 2) Abrir ajustes de PVR/Timeshift como fallback
-        tried = []
-        def _try(cmd, wait=600):
-            tried.append(cmd)
-            xbmc.executebuiltin(cmd)
-            xbmc.sleep(wait)
+        # Flujo no-Android
+        if _has_addon('pvr.iptvsimple'):
+            _open_settings_retry('pvr.iptvsimple', attempts=1, delay_ms=800)
+            return
 
-        _try('ActivateWindow(pvrsettings)')
-        # Algunos builds aceptan parámetros de categoría en settings
-        _try('ActivateWindow(settings,pvr,return)')
-        _try('ActivateWindow(settings)')
-
-        # 3) Como último recurso, abrir el navegador de addons en clientes PVR
-        _try('ActivateWindow(AddonBrowser,addons://all/pvr/,return)', wait=400)
-
-        # Pequeña ayuda si no se logró abrir directamente
-        msg = (
-            'Si no se abrió directamente Timeshift o el cliente IPTV Simple, ve a:\n'
-            '- Ajustes (modo Experto)\n'
-            '- TV en directo / PVR & Live TV\n'
-            '- Timeshift\n\n'
-            'Para iptvsimple: Ajustes -> Add-ons -> Mis add-ons -> Clientes PVR -> IPTV Simple Client\n\n'
-            'Intentos ejecutados:\n' + '\n'.join(tried)
-        )
-        xbmcgui.Dialog().ok('Ajustes de Timeshift', msg)
+        # Fallback: abrir ajustes de PVR/Timeshift
+        cmds = [
+            'ActivateWindow(pvrsettings)',
+            'ActivateWindow(settings,pvr,return)',
+            'ActivateWindow(settings)'
+        ]
+        for c in cmds:
+            xbmc.executebuiltin(c)
+            xbmc.sleep(500)
+        dialog.notification('Ajustes PVR', 'Si no ves Timeshift: Ajustes > TV en directo > Timeshift', time=4000)
     except Exception as e:
         log('Error abriendo ajustes de Timeshift: %s' % str(e))
-        xbmcgui.Dialog().ok('Error', 'No se pudieron abrir los ajustes: %s' % str(e))
+        xbmcgui.Dialog().notification('Error', 'No se pudieron abrir ajustes', time=4000)
 
 def perform_speed_test(timeout=15, urls=None):
     """Realiza una descarga corta para estimar velocidad (Mbps)"""

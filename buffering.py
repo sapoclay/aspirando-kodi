@@ -75,6 +75,15 @@ def is_linux_desktop() -> bool:
     except Exception:
         return os.name == 'posix'
 
+def is_android() -> bool:
+    try:
+        return xbmc.getCondVisibility('system.platform.android')
+    except Exception:
+        return False
+
+def device_label() -> str:
+    return 'Almacenamiento externo' if is_android() else 'USB'
+
 def shorten_path(p: str, max_len: int = 28) -> str:
     try:
         if len(p) <= max_len:
@@ -137,6 +146,9 @@ def detect_usb_devices():
     usb_devices = []
     try:
         mount_bases = ['/media', '/mnt', '/run/media']
+        if is_android():
+            # En Android intentamos en /storage y /mnt/media_rw
+            mount_bases.extend(['/storage', '/mnt/media_rw'])
         for base_path in mount_bases:
             if os.path.exists(base_path):
                 try:
@@ -176,7 +188,7 @@ def detect_usb_devices():
                     if len(parts) >= 3:
                         mountpoint = parts[1]
                         fstype = parts[2]
-                        if (mountpoint.startswith('/media/') or mountpoint.startswith('/mnt/') or mountpoint.startswith('/run/media/')) and \
+                        if (mountpoint.startswith('/media/') or mountpoint.startswith('/mnt/') or mountpoint.startswith('/run/media/') or mountpoint.startswith('/storage/')) and \
                            fstype in ['vfat', 'ntfs', 'exfat', 'ext4', 'ext3', 'ext2']:
                             if os.path.exists(mountpoint) and os.access(mountpoint, os.W_OK):
                                 try:
@@ -200,12 +212,14 @@ def browse_for_usb_folder():
     try:
         dialog = xbmcgui.Dialog()
         try:
-            path = dialog.browse(3, 'Selecciona carpeta en tu USB', 'files', '', False, True, '/media')
+            start_dir = '/storage' if is_android() else '/media'
+            path = dialog.browse(3, 'Selecciona carpeta en tu %s' % device_label(), 'files', '', False, True, start_dir)
         except Exception:
             path = ''
         if path and isinstance(path, str) and os.path.isdir(path):
             return path
-        path = dialog.input('Introduce ruta del USB (p. ej. /media/USUARIO/NOMBRE)', type=xbmcgui.INPUT_ALPHANUM)
+        placeholder = '/storage/XXXX-XXXX' if is_android() else '/media/USUARIO/NOMBRE'
+        path = dialog.input('Introduce ruta (%s)' % placeholder, type=xbmcgui.INPUT_ALPHANUM)
         if path and os.path.isdir(path):
             return path
     except Exception as e:
@@ -1066,7 +1080,7 @@ def save_buffering_config_to_usb(config_path):
                 usb['name'], usb.get('free', 'N/A'), usb.get('size', 'N/A'), usb['path'])
             usb_options.append(label)
             log('USB opción %d: %s' % (i, label))
-        usb_selection = dialog.select('Seleccionar USB para Guardar', usb_options)
+        usb_selection = dialog.select('Seleccionar %s para Guardar' % device_label(), usb_options)
         if usb_selection == -1:
             log('Usuario canceló selección de USB')
             return
@@ -1080,8 +1094,8 @@ def save_buffering_config_to_usb(config_path):
         except Exception as e:
             dialog.ok('Error', 'Error leyendo configuración: %s' % str(e))
             return
-        confirm_msg = ('Guardar configuración en:\n\nUSB: %s\nRuta: %s\nEspacio libre: %s\n\n¿Continuar?') % (
-                          selected_usb['name'], selected_usb['path'], selected_usb.get('free', 'Desconocido'))
+        confirm_msg = ('Guardar configuración en:\n\n%s: %s\nRuta: %s\nEspacio libre: %s\n\n¿Continuar?') % (
+            device_label(), selected_usb['name'], selected_usb['path'], selected_usb.get('free', 'Desconocido'))
         if not dialog.yesno('Confirmar Guardado', confirm_msg, yeslabel='Guardar', nolabel='Cancelar'):
             log('Usuario canceló confirmación de guardado')
             return
@@ -1092,13 +1106,13 @@ def save_buffering_config_to_usb(config_path):
             dialog.ok('Guardado Completado', result_msg)
             log('Guardado completado exitosamente: %s' % saved_file)
         except Exception as e:
-            error_msg = 'Error guardando en USB:\n\n%s\n\nVerifica que:\n• El USB sigue conectado\n• Hay espacio suficiente\n• Tienes permisos de escritura' % str(e)
+            error_msg = 'Error guardando en %s:\n\n%s\n\nVerifica que:\n• Sigue conectado\n• Hay espacio suficiente\n• Tienes permisos de escritura' % (device_label(), str(e))
             dialog.ok('Error de Guardado', error_msg)
             log('Error en guardado: %s' % str(e))
-        if dialog.yesno('Usar USB para buffering',
-                        '¿Deseas que Kodi use este USB como directorio de cache (cachepath)\n'
+        if dialog.yesno('Usar %s para buffering' % device_label(),
+                        '¿Deseas que Kodi use este %s como directorio de cache (cachepath)\n'
                         'para el buffering? Esto permite usar más espacio que la RAM.\n\n'
-                        'Nota: El medio debe ser rápido y estar siempre conectado.',
+                        'Nota: El medio debe ser rápido y estar siempre conectado.' % device_label(),
                         yeslabel='Configurar', nolabel='No'):
             try:
                 cache_dir = os.path.join(selected_usb['path'], 'KodiCache')
@@ -1141,12 +1155,12 @@ def save_buffering_config_to_usb(config_path):
                     except Exception as e2:
                         dialog.ok('Error', 'No se pudo escribir advancedsettings.xml: %s' % str(e2))
                         return
-                dialog.ok('Buffer en USB configurado',
+                dialog.ok('Buffer externo configurado',
                           'Se configuró cachepath en:\n%s\n\nReinicia Kodi para aplicar los cambios.' % cache_dir)
-                log('Cachepath configurado en USB: %s' % cache_dir)
+                log('Cachepath configurado en externo: %s' % cache_dir)
             except Exception as e:
                 log('Error configurando cachepath: %s' % str(e))
-                dialog.ok('Error', 'Error configurando cache en USB: %s' % str(e))
+                dialog.ok('Error', 'Error configurando cache en almacenamiento externo: %s' % str(e))
     except Exception as e:
         log('Error general en save_buffering_config_to_usb: %s' % str(e))
         xbmcgui.Dialog().ok('Error', 'Error guardando en USB: %s' % str(e))
@@ -1160,10 +1174,10 @@ def configure_usb_cachepath(config_path):
             if sel:
                 devices = [{'name': os.path.basename(sel) or 'USB seleccionado', 'path': sel}]
         if not devices:
-            dialog.ok('Sin USBs', 'No se detectaron USBs y no se seleccionó carpeta.')
+            dialog.ok('Sin %s' % device_label(), 'No se detectaron %s y no se seleccionó carpeta.' % device_label().lower())
             return
         labels = ['%s (%s)' % (d['path'], d.get('free', '')) for d in devices]
-        idx = dialog.select('Selecciona USB para cache', labels)
+        idx = dialog.select('Selecciona %s para cache' % device_label(), labels)
         if idx == -1:
             return
         selected = devices[idx]
@@ -1200,11 +1214,68 @@ def configure_usb_cachepath(config_path):
             fh = xbmcvfs.File(config_path, 'w')
             fh.write(config)
             fh.close()
-        dialog.ok('Cache en USB configurada', 'cachepath: %s\nReinicia Kodi para aplicar.' % cache_dir)
+        dialog.ok('Cache externa configurada', 'cachepath: %s\nReinicia Kodi para aplicar.' % cache_dir)
         log('cachepath configurado en: %s' % cache_dir)
     except Exception as e:
         log('Error configurando USB como cache: %s' % str(e))
-        xbmcgui.Dialog().ok('Error', 'Error configurando cache en USB: %s' % str(e))
+        xbmcgui.Dialog().ok('Error', 'Error configurando cache en almacenamiento externo: %s' % str(e))
+
+def configure_external_cachepath_android(config_path):
+    try:
+        if not is_android():
+            return configure_usb_cachepath(config_path)
+        dialog = xbmcgui.Dialog()
+        devices = detect_usb_devices()
+        if not devices:
+            sel = browse_for_usb_folder()
+            if sel:
+                devices = [{'name': os.path.basename(sel) or 'Almacenamiento', 'path': sel}]
+        if not devices:
+            dialog.ok('Sin almacenamiento', 'No se detectaron ubicaciones y no se seleccionó carpeta.')
+            return
+        labels = ['%s (%s)' % (d['path'], d.get('free', '')) for d in devices]
+        idx = dialog.select('Selecciona almacenamiento para cache', labels)
+        if idx == -1:
+            return
+        selected = devices[idx]
+        cache_dir = os.path.join(selected['path'], 'KodiCache')
+        try:
+            os.makedirs(cache_dir, exist_ok=True)
+        except Exception:
+            pass
+        config = '''<advancedsettings>
+    <network>
+        <buffermode>2</buffermode>
+        <cachemembuffersize>0</cachemembuffersize>
+        <readbufferfactor>4.0</readbufferfactor>
+    </network>
+    <video>
+        <memorysize>0</memorysize>
+        <readbufferfactor>4.0</readbufferfactor>
+    </video>
+    <cache>
+        <cachepath>%s</cachepath>
+    </cache>
+</advancedsettings>''' % cache_dir
+        backup_advancedsettings(config_path)
+        parent = os.path.dirname(config_path)
+        try:
+            if parent and not os.path.exists(parent):
+                os.makedirs(parent, exist_ok=True)
+        except Exception:
+            pass
+        try:
+            with open(config_path, 'w', encoding='utf-8') as f:
+                f.write(config)
+        except Exception:
+            fh = xbmcvfs.File(config_path, 'w')
+            fh.write(config)
+            fh.close()
+        dialog.ok('Cache externa configurada', 'cachepath: %s\nReinicia Kodi para aplicar.' % cache_dir)
+        log('cachepath configurado en: %s' % cache_dir)
+    except Exception as e:
+        log('Error configurando cache externo Android: %s' % str(e))
+        xbmcgui.Dialog().ok('Error', 'Error configurando cache externo: %s' % str(e))
 
 def read_speed(urls=None, timeout=15):
     try:
@@ -1372,7 +1443,7 @@ def test_usb_cachepath(config_path):
             'Escritura: %s' % ('OK' if write_ok else 'FALLO'),
             'Lectura: %s' % ('OK' if read_ok else 'FALLO')
         ]
-        dialog.ok('Prueba de cache USB', '\n'.join(msg))
+        dialog.ok('Prueba de cache externa', '\n'.join(msg))
     except Exception as e:
         log('Error en test_usb_cachepath: %s' % str(e))
         xbmcgui.Dialog().ok('Error', 'Error en prueba de cache: %s' % str(e))

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="script.aspirando-kodi" name="Aspirando Kodi" version="1.0.14" provider-name="entreunosyceros">
+<addon id="script.aspirando-kodi" name="Aspirando Kodi" version="1.0.35" provider-name="entreunosyceros">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
     </requires>
@@ -26,57 +26,13 @@ Funciones principales:
 Incluye un pequeño servicio que, si está programado, ejecuta la limpieza al arrancar Kodi mostrando un resumen previo.
 
 Recomendación: tras cambiar la configuración de buffering, reinicia Kodi para aplicar los cambios.</description>
-    <news>v1.0.14
-- Reorganización modular: funciones de buffering separadas en buffering.py para un código más limpio
-- Menú de Gestión de Buffering agrupado por categorías (legibilidad y usabilidad)
-- Ajustes menores en atajos (Timeshift) y estado de special://temp en menús
-
-v1.0.13
-- Mejorada detección y mensajes cuando no hay cachepath pero special://temp está redirigido a USB
-
-v1.0.12
-- URLs del test de velocidad actualizadas a endpoints más fiables (ThinkBroadband y DigitalOcean)
-
-v1.0.11
-- Acceso directo para abrir los ajustes de Timeshift (PVR & Live TV)
-
-v1.0.10
-- Utilidad para probar escritura en special://temp/cache
-
-v1.0.9
-- Visor de caché actual (special://temp) y listado de archivos recientes
-- Redirigir caché a USB mediante enlace simbólico (y opción de revertir)
-
-v1.0.8
-- Auto-limpieza de cache USB al parar/terminar reproducción (opcional)
-- Prueba de cache USB (lectura/escritura) desde el menú
-
-v1.0.7
-- Opción directa para configurar USB como cache y mejoras de visualización del cachepath
-
-v1.0.6
-- Test de velocidad con elección de servidor
-- Modo streaming basado en bitrate (preserva cachepath si existe)
-
-v1.0.5
-- Test de velocidad con recomendación automática de buffering
-
-v1.0.4
-- Icono principal corregido (icon.png en metadata y paquete)
-
-v1.0.3
-- Copias de seguridad y restauración de advancedsettings.xml
-- Optimización automática de buffering
-- Compactación de bases de datos de Kodi
-
-v1.0.2
-- Ver valores de advancedsettings.xml (parseo y vista legible)
-
-v1.0.1
-- Servicio de inicio para limpieza programada con aviso previo
-
-v1.0.0
-- Limpieza de caché, thumbnails, paquetes y temporales; gestión básica/avanzada de buffering</news>
+    <news>v1.0.35
+- Nueva funcionalidad "Corregir sincronización A/V progresiva": soluciona el problema de desincronización progresiva donde el audio se adelanta al video durante la reproducción
+- Métodos de corrección avanzados: corrección por timestamps, buffers separados A/V, compensación de drift de reloj y configuración conservadora
+- Diagnósticos de sincronización A/V para identificar y corregir problemas específicos de desincronización
+- Configuración automática de parámetros de audio (resample a 48kHz, sincronización con display clock)
+- Optimizaciones específicas para IPTV y streaming de video en vivo
+- Incluye todas las funcionalidades de optimización de video e IPTV de versiones anteriores</news>
         <assets>
             <icon>icon.png</icon>
             <fanart>fanart.png</fanart>

@@ -4,6 +4,7 @@ import xbmcaddon
 import json
 import os
 import time
+import xbmcvfs
 
 # Servicio de arranque: ejecuta limpieza si está programada
 addon = xbmcaddon.Addon()
@@ -100,7 +101,12 @@ class PlaybackMonitor(xbmc.Player):
                 # Usar advancedsettings del perfil
                 paths = self.mod.get_kodi_paths()
                 cfg = paths.get('advancedsettings', '')
-                self.mod.clean_usb_cachepath(cfg)
+                # Ejecutar en modo silencioso para no interrumpir la reproducción/UX
+                try:
+                    self.mod.clean_usb_cachepath(cfg, silent=True)
+                except TypeError:
+                    # Compatibilidad con versiones previas sin 'silent'
+                    self.mod.clean_usb_cachepath(cfg)
         except Exception as e:
             log('Auto-limpieza cache USB falló: %s' % str(e))
 
@@ -122,12 +128,14 @@ if __name__ == '__main__':
                     data = json.load(f)
                 if data.get('scheduled'):
                     run_clean()
-            finally:
-                # Borrar programación para que no se repita
-                try:
-                    os.remove(schedule_path)
-                except Exception:
-                    pass
+                    # Si no es repetitivo, desactivar para próximos inicios
+                    if not data.get('repeat', False):
+                        try:
+                            os.remove(schedule_path)
+                        except Exception:
+                            pass
+            except Exception as e:
+                log('Error leyendo programación: %s' % str(e))
         else:
             log('Sin limpieza programada')
 
@@ -143,6 +151,80 @@ if __name__ == '__main__':
             player = PlaybackMonitor(mod)
         except Exception as e:
             log('No se pudo iniciar PlaybackMonitor: %s' % str(e))
+
+        # Watchdog Android: detectar bloqueo de PVR tras activar Timeshift
+        try:
+            is_android = xbmc.getCondVisibility('system.platform.android')
+        except Exception:
+            is_android = False
+
+        if is_android:
+            try:
+                # Esperar a que PVR cargue canales hasta 35s
+                start = time.time()
+                has_channels = False
+                while not monitor.abortRequested() and (time.time() - start) < 35:
+                    has_tv = xbmc.getCondVisibility('PVR.HasTVChannels')
+                    has_radio = xbmc.getCondVisibility('PVR.HasRadioChannels')
+                    has_channels = bool(has_tv or has_radio)
+                    if has_channels:
+                        break
+                    xbmc.sleep(1000)
+
+                if not has_channels:
+                    # Posible bloqueo por Timeshift/almacenamiento en Android
+                    dlg = xbmcgui.Dialog()
+                    choice = dlg.select('PVR bloqueado en Android', [
+                        'Deshabilitar IPTV Simple ahora (recomendado)',
+                        'Ajustar buffering a RAM y reiniciar',
+                        'No hacer nada'
+                    ])
+                    if choice == 0:
+                        try:
+                            xbmc.executebuiltin('DisableAddon(pvr.iptvsimple)')
+                            xbmc.sleep(800)
+                            dlg.notification(addon_name, 'IPTV Simple deshabilitado. Revisa Timeshift y vuelve a habilitar.', time=5000)
+                        except Exception as e:
+                            log('No se pudo deshabilitar pvr.iptvsimple: %s' % str(e))
+                    elif choice == 1:
+                        try:
+                            # Escribir advancedsettings para usar RAM (50MB)
+                            paths = mod.get_kodi_paths()
+                            cfg = paths.get('advancedsettings', '')
+                            mod.backup_advancedsettings(cfg)
+                            content = '''<advancedsettings>
+    <network>
+        <buffermode>1</buffermode>
+        <cachemembuffersize>52428800</cachemembuffersize>
+        <readbufferfactor>4.0</readbufferfactor>
+    </network>
+    <video>
+        <memorysize>52428800</memorysize>
+        <readbufferfactor>4.0</readbufferfactor>
+    </video>
+    <cache>
+    </cache>
+</advancedsettings>'''
+                            # Asegurar directorio
+                            parent = os.path.dirname(cfg)
+                            try:
+                                if parent and not os.path.exists(parent):
+                                    os.makedirs(parent, exist_ok=True)
+                            except Exception:
+                                pass
+                            try:
+                                with open(cfg, 'w', encoding='utf-8') as f:
+                                    f.write(content)
+                            except Exception:
+                                fh = xbmcvfs.File(cfg, 'w')
+                                fh.write(content)
+                                fh.close()
+                            if dlg.yesno('Buffering a RAM aplicado', 'Se aplicaron valores seguros (RAM).\n¿Reiniciar Kodi ahora?', yeslabel='Reiniciar', nolabel='Luego'):
+                                xbmc.executebuiltin('RestartApp')
+                        except Exception as e:
+                            log('Error ajustando buffering seguro: %s' % str(e))
+            except Exception as e:
+                log('Watchdog Android falló: %s' % str(e))
 
         # Bucle de servicio
         while not monitor.abortRequested():
