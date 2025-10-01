@@ -2,9 +2,11 @@
 
 <img width="1024" height="1024" alt="icono" src="https://github.com/user-attachments/assets/3321db4d-e6e0-4619-9027-7db537574499" />
 
-Herramienta de limpieza y optimización para Kodi: caché, thumbnails, paquetes, temporales, buf## Solución de Cuelgues en Android 🔴
+Herramienta de limpieza y optimización para Kodi: caché, thumbnails, paquetes, temporales, bufering y más ...
 
-### **Problema Crítico: Dispositivo se Cu- **Android (monitor de memoria)**: Si al iniciar Kodi ves una alerta sobre buffer alto, ACEPTA la corrección automática. Esto previene cuelgues del dispositivo. El addon crea backup automático antes de modificar.
+## Solución de Cuelgues en Android 🔴
+
+### Si al iniciar Kodi ves una alerta sobre buffer alto, ACEPTA la corrección automática. Esto previene cuelgues del dispositivo. El addon crea backup automático antes de modificar.
 - **Android (cuelgues durante reproducción)**: Si tu dispositivo se congela tras 2-3 minutos reproduciendo vídeo, el buffer está demasiado alto. Usa "Perfil Android (seguro)" inmediatamente. Ver sección "Solución de Cuelgues en Android" arriba.
 - Android: si no abre la configuración de IPTV Simple, verifica que el addon esté instalado y habilitado. El atajo del addon intentará hacerlo por ti y mostrará el buscador si falta.
 - Android (post-Timeshift): si tras habilitar Timeshift y reiniciar Kodi no aparece la lista de canales, espera ~35 s; el servicio mostrará un diálogo con opciones para recuperar (deshabilitar IPTV Simple o aplicar buffering en RAM y reiniciar). Si no ves el diálogo, abre el addon y usa "Abrir ajustes de Timeshift…".
