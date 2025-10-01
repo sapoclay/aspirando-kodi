@@ -1,0 +1,58 @@
+# XBMC Media Center language file
+# Addon Name: Aspirando Kodi
+# Addon id: script.aspirando-kodi
+# Addon version: 1.0.25
+# Addon Provider: entreunosyceros
+msgid ""
+msgstr ""
+"Project-Id-Version: XBMC Addons\n"
+"Report-Msgid-Bugs-To: alanwww1@xbmc.org\n"
+"POT-Creation-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: XBMC Translation Team\n"
+"Language-Team: English (http://www.transifex.com/projects/p/xbmc-addons/language/en/)\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: en_GB\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgctxt "#30001"
+msgid "Buffering Configuration"
+msgstr "Buffering Configuration"
+
+msgctxt "#30002"
+msgid "Use custom ReadBufferFactor"
+msgstr "Use custom ReadBufferFactor"
+
+msgctxt "#30003"
+msgid "ReadBufferFactor value (1.0 - 8.0)"
+msgstr "ReadBufferFactor value (1.0 - 8.0)"
+
+msgctxt "#30004"
+msgid "Enable Android-specific optimizations"
+msgstr "Enable Android-specific optimizations"
+
+msgctxt "#30005"
+msgid "Maximum buffer size for Android"
+msgstr "Maximum buffer size for Android"
+
+msgctxt "#30006"
+msgid "Enable audio/video sync corrections"
+msgstr "Enable audio/video sync corrections"
+
+msgctxt "#30007"
+msgid "Video delay correction (ms)"
+msgstr "Video delay correction (ms)"
+
+msgctxt "#30008"
+msgid "Audio delay correction (ms)"
+msgstr "Audio delay correction (ms)"
+
+msgctxt "#30009"
+msgid "Use conservative buffering (reduces stuttering)"
+msgstr "Use conservative buffering (reduces stuttering)"
+
+msgctxt "#30010"
+msgid "Enable aggressive prefetch (faster loading)"
+msgstr "Enable aggressive prefetch (faster loading)"

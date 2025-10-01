@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="script.aspirando-kodi" name="Aspirando Kodi" version="1.0.35" provider-name="entreunosyceros">
+<addon id="script.aspirando-kodi" name="Aspirando Kodi" version="1.0.36" provider-name="entreunosyceros">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
     </requires>
@@ -9,12 +9,17 @@
     <extension point="xbmc.service" library="service.py" start="startup" />
     <extension point="xbmc.addon.metadata">
         <platform>all</platform>
-    <summary>Limpiador y optimizador para Kodi: caché, thumbnails, paquetes, temporales, buffering y más</summary>
-    <description>Aspirando Kodi es una herramienta completa para mantener tu Kodi ágil y optimizado.
+        <summary>Limpiador y optimizador completo para Kodi: caché, thumbnails, buffering, optimizaciones de video e IPTV</summary>
+        <description>Aspirando Kodi es una herramienta completa para mantener tu Kodi ágil y optimizado.
 
 Funciones principales:
 - Limpieza selectiva y completa: caché, thumbnails, paquetes y temporales
 - Gestión de buffering: modos básico/avanzado, optimización automática según tu equipo
+- Configuración personalizable: factor de lectura (readbufferfactor) configurable por el usuario
+- Optimizaciones de video avanzadas: aceleración por hardware, escalado, refresh rate automático
+- Configuraciones específicas para IPTV: buffering, timeouts, seeking y EPG optimizados
+- Configuración de audio: normalización, passthrough, upsampling y sincronización
+- Perfiles de calidad de video: máxima calidad, balanceado, máximo rendimiento
 - Visualiza y gestiona advancedsettings.xml: ver valores, crear/guardar/eliminar configuración
 - Copias de seguridad y restauración de advancedsettings.xml con un clic
 - Guardar configuración de buffering en USB para usarla en otros equipos
@@ -23,10 +28,32 @@ Funciones principales:
 - Diagnóstico de dispositivos USB accesibles desde Kodi
 - Información del addon y acceso rápido al repositorio
 
+Optimizaciones IPTV especializadas:
+- Buffering específico con perfiles por tipo de dispositivo y conexión
+- Timeouts de red optimizados para estabilidad en streaming IPTV
+- Prioridades de codec para mejor compatibilidad (Hardware/Software/Balanceado)
+- Seeking configurable para Live TV, VOD y Catchup
+- Optimización de caché EPG según tamaño de lista de canales
+- Configuración completa IPTV con un solo clic
+
+Compatibilidad multiplataforma:
+- Linux/LibreELEC/CoreELEC: funcionalidad completa con VAAPI/VDPAU
+- Android: optimizaciones específicas con MediaCodec y configuraciones adaptadas
+- Windows: soporte completo con DXVA2
+
 Incluye un pequeño servicio que, si está programado, ejecuta la limpieza al arrancar Kodi mostrando un resumen previo.
 
-Recomendación: tras cambiar la configuración de buffering, reinicia Kodi para aplicar los cambios.</description>
-    <news>v1.0.35
+Recomendación: tras cambiar la configuración de buffering o video, reinicia Kodi para aplicar los cambios.</description>
+        <news>v1.0.36
+- 🚀 Buffering Básico Inteligente: detección automática de RAM con recomendaciones específicas (desde 512MB hasta 8GB+)
+- 🎯 7 Perfiles de Buffering Avanzado: Streaming Local/Red, IPTV/TV en Vivo, Contenido 4K, Conexión Lenta, Conexión Rápida/Fibra, Ahorro de RAM, Rendimiento Máximo
+- 🔍 Optimización Automática Completa: análisis inteligente de RAM, tipo de almacenamiento (NVMe/SSD/HDD/SD), conexión de red (WiFi/Ethernet)
+- 📊 Reportes Detallados: cada configuración incluye análisis completo del sistema y explicaciones de las optimizaciones aplicadas
+- 🔧 Ajustes Android Mejorados: límites específicos y configuraciones conservadoras para dispositivos Android
+- 💾 Backups Automáticos: todas las configuraciones crean respaldo de advancedsettings.xml
+- ✅ Vista Previa de Cambios: muestra exactamente qué se va a aplicar antes de confirmar
+- 📝 Explicaciones Contextuales: cada perfil incluye cuándo usarlo y qué beneficios aporta
+v1.0.35
 - Nueva funcionalidad "Corregir sincronización A/V progresiva": soluciona el problema de desincronización progresiva donde el audio se adelanta al video durante la reproducción
 - Métodos de corrección avanzados: corrección por timestamps, buffers separados A/V, compensación de drift de reloj y configuración conservadora
 - Diagnósticos de sincronización A/V para identificar y corregir problemas específicos de desincronización

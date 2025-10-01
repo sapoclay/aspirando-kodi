@@ -12,7 +12,7 @@ addon_id = addon.getAddonInfo('id')
 addon_name = addon.getAddonInfo('name')
 
 try:
-    addon_data_dir = xbmc.translatePath('special://profile/addon_data/%s' % addon_id)
+    addon_data_dir = xbmcvfs.translatePath('special://profile/addon_data/%s' % addon_id)
 except Exception:
     addon_data_dir = os.path.expanduser('~/.kodi/userdata/addon_data/%s' % addon_id)
 
@@ -101,12 +101,7 @@ class PlaybackMonitor(xbmc.Player):
                 # Usar advancedsettings del perfil
                 paths = self.mod.get_kodi_paths()
                 cfg = paths.get('advancedsettings', '')
-                # Ejecutar en modo silencioso para no interrumpir la reproducción/UX
-                try:
-                    self.mod.clean_usb_cachepath(cfg, silent=True)
-                except TypeError:
-                    # Compatibilidad con versiones previas sin 'silent'
-                    self.mod.clean_usb_cachepath(cfg)
+                self.mod.clean_usb_cachepath(cfg)
         except Exception as e:
             log('Auto-limpieza cache USB falló: %s' % str(e))
 
@@ -158,20 +153,50 @@ if __name__ == '__main__':
         except Exception:
             is_android = False
 
-        if is_android:
+        # Verificar si el usuario ya manejó el problema de PVR en Android
+        android_pvr_handled_file = os.path.join(addon_data_dir, 'android_pvr_handled.flag')
+        android_pvr_already_handled = os.path.exists(android_pvr_handled_file)
+
+        if is_android and not android_pvr_already_handled:
             try:
-                # Esperar a que PVR cargue canales hasta 35s
+                # Esperar a que Kodi esté completamente iniciado
+                log('Android detectado: esperando a que PVR cargue...')
+                
+                # Dar más tiempo para que Kodi y los addons se inicialicen completamente
                 start = time.time()
                 has_channels = False
-                while not monitor.abortRequested() and (time.time() - start) < 35:
-                    has_tv = xbmc.getCondVisibility('PVR.HasTVChannels')
-                    has_radio = xbmc.getCondVisibility('PVR.HasRadioChannels')
-                    has_channels = bool(has_tv or has_radio)
-                    if has_channels:
-                        break
-                    xbmc.sleep(1000)
+                pvr_addon_enabled = False
+                initialization_time = 180  # Aumentado a 180 segundos (3 minutos)
+                
+                while not monitor.abortRequested() and (time.time() - start) < initialization_time:
+                    # Verificar si IPTV Simple está habilitado
+                    try:
+                        pvr_addon_enabled = xbmc.getCondVisibility('System.HasAddon(pvr.iptvsimple)')
+                    except Exception:
+                        pvr_addon_enabled = False
+                    
+                    # Solo verificar canales si el addon PVR está habilitado
+                    if pvr_addon_enabled:
+                        try:
+                            has_tv = xbmc.getCondVisibility('PVR.HasTVChannels')
+                            has_radio = xbmc.getCondVisibility('PVR.HasRadioChannels')
+                            has_channels = bool(has_tv or has_radio)
+                            
+                            if has_channels:
+                                log('PVR canales detectados correctamente')
+                                break
+                        except Exception:
+                            pass
+                    
+                    # Mostrar progreso cada 20 segundos
+                    elapsed = int(time.time() - start)
+                    if elapsed % 20 == 0 and elapsed > 0:
+                        log(f'Esperando PVR... {elapsed}s de {initialization_time}s')
+                    
+                    xbmc.sleep(3000)  # Verificar cada 3 segundos para dar más tiempo
 
-                if not has_channels:
+                # Solo mostrar diálogo si hay un addon PVR habilitado pero sin canales
+                if pvr_addon_enabled and not has_channels:
                     # Posible bloqueo por Timeshift/almacenamiento en Android
                     dlg = xbmcgui.Dialog()
                     choice = dlg.select('PVR bloqueado en Android', [
@@ -179,6 +204,16 @@ if __name__ == '__main__':
                         'Ajustar buffering a RAM y reiniciar',
                         'No hacer nada'
                     ])
+                    
+                    # Crear bandera para indicar que el usuario ya manejó este problema
+                    try:
+                        if not os.path.exists(addon_data_dir):
+                            os.makedirs(addon_data_dir, exist_ok=True)
+                        with open(android_pvr_handled_file, 'w') as f:
+                            f.write('handled')
+                    except Exception as e:
+                        log('No se pudo crear archivo de bandera: %s' % str(e))
+                    
                     if choice == 0:
                         try:
                             xbmc.executebuiltin('DisableAddon(pvr.iptvsimple)')
@@ -189,9 +224,35 @@ if __name__ == '__main__':
                     elif choice == 1:
                         try:
                             # Escribir advancedsettings para usar RAM (50MB)
-                            paths = mod.get_kodi_paths()
-                            cfg = paths.get('advancedsettings', '')
-                            mod.backup_advancedsettings(cfg)
+                            # Cargar utilidades de default.py si están disponibles
+                            try:
+                                import importlib.util, sys
+                                addon_path = addon.getAddonInfo('path')
+                                default_path = os.path.join(addon_path, 'default.py')
+                                spec = importlib.util.spec_from_file_location('aspirando_default', default_path)
+                                mod = importlib.util.module_from_spec(spec)
+                                sys.modules['aspirando_default'] = mod
+                                spec.loader.exec_module(mod)
+                            except Exception:
+                                mod = None
+
+                            if mod and hasattr(mod, 'get_kodi_paths'):
+                                paths = mod.get_kodi_paths()
+                                cfg = paths.get('advancedsettings', '')
+                            else:
+                                # Ruta por defecto del perfil
+                                try:
+                                    cfg = xbmcvfs.translatePath('special://profile/advancedsettings.xml')
+                                except Exception:
+                                    cfg = os.path.expanduser('~/.kodi/userdata/advancedsettings.xml')
+
+                            # Copia de seguridad si es posible
+                            try:
+                                if mod and hasattr(mod, 'backup_advancedsettings'):
+                                    mod.backup_advancedsettings(cfg)
+                            except Exception:
+                                pass
+
                             content = '''<advancedsettings>
     <network>
         <buffermode>1</buffermode>
@@ -223,6 +284,21 @@ if __name__ == '__main__':
                                 xbmc.executebuiltin('RestartApp')
                         except Exception as e:
                             log('Error ajustando buffering seguro: %s' % str(e))
+                else:
+                    # PVR funcionando correctamente o no hay addon PVR habilitado
+                    if not pvr_addon_enabled:
+                        log('No hay addon PVR habilitado, omitiendo verificación')
+                    else:
+                        log('PVR funcionando correctamente')
+                    
+                    # Crear bandera para evitar verificaciones futuras innecesarias
+                    try:
+                        if not os.path.exists(addon_data_dir):
+                            os.makedirs(addon_data_dir, exist_ok=True)
+                        with open(android_pvr_handled_file, 'w') as f:
+                            f.write('pvr_working_correctly')
+                    except Exception as e:
+                        log('No se pudo crear archivo de bandera (PVR OK): %s' % str(e))
             except Exception as e:
                 log('Watchdog Android falló: %s' % str(e))
 

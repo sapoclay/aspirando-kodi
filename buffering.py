@@ -147,7 +147,6 @@ def detect_usb_devices():
     try:
         mount_bases = ['/media', '/mnt', '/run/media']
         if is_android():
-            # En Android intentamos en /storage y /mnt/media_rw
             mount_bases.extend(['/storage', '/mnt/media_rw'])
         for base_path in mount_bases:
             if os.path.exists(base_path):
@@ -718,6 +717,112 @@ def optimize_buffering_auto(config_path):
     except Exception as e:
         log('Error en optimización automática: %s' % str(e))
         xbmcgui.Dialog().ok('Error', 'Error optimizando buffering: %s' % str(e))
+
+def configure_android_safe_profile(config_path):
+    """Perfil Android (seguro):
+    - RAM-only (sin cachepath)
+    - Buffer moderado (~50 MB)
+    - ReadBufferFactor conservador (~3.2)
+    - buffermode=1
+    """
+    try:
+        buf = 52428800  # 50 MB
+        factor = 3.2
+        config = '''<advancedsettings>
+    <network>
+        <buffermode>1</buffermode>
+        <cachemembuffersize>%d</cachemembuffersize>
+        <readbufferfactor>%.1f</readbufferfactor>
+    </network>
+    <video>
+        <memorysize>%d</memorysize>
+        <readbufferfactor>%.1f</readbufferfactor>
+    </video>
+    <cache>
+    </cache>
+</advancedsettings>''' % (buf, factor, buf, factor)
+
+        msg = ('Perfil Android (seguro):\n\n'
+               '- Buffer en memoria: %s\n'
+               '- ReadBufferFactor: %.1f\n'
+               '- Modo: RAM (sin disco)\n\n'
+               'Recomendado para cajas Android con buffering alto\n'
+               'o desincronización A/V. ¿Aplicar?') % (format_size(buf), factor)
+        if not xbmcgui.Dialog().yesno('Perfil Android (seguro)', msg, yeslabel='Aplicar', nolabel='Cancelar'):
+            return
+
+        backup_advancedsettings(config_path)
+        parent = os.path.dirname(config_path)
+        try:
+            if parent and not os.path.exists(parent):
+                os.makedirs(parent, exist_ok=True)
+        except Exception:
+            pass
+        try:
+            with open(config_path, 'w', encoding='utf-8') as f:
+                f.write(config)
+        except Exception:
+            fh = xbmcvfs.File(config_path, 'w')
+            fh.write(config)
+            fh.close()
+        xbmcgui.Dialog().ok('Configuración aplicada', 'Perfil Android (seguro) aplicado. Reinicia Kodi para aplicar los cambios.')
+        log('Perfil Android (seguro) aplicado: buf=%s, factor=%.1f' % (format_size(buf), factor))
+    except Exception as e:
+        log('Error aplicando Perfil Android (seguro): %s' % str(e))
+        xbmcgui.Dialog().ok('Error', 'Error aplicando perfil Android: %s' % str(e))
+
+def configure_iptv_low_latency_profile(config_path):
+    """Perfil IPTV (latencia baja):
+    - RAM-only (sin cachepath)
+    - Buffer pequeño (~32 MB) para reducir retraso
+    - ReadBufferFactor moderado (3.0)
+    - buffermode=1
+    """
+    try:
+        buf = 33554432  # 32 MB
+        factor = 3.0
+        config = '''<advancedsettings>
+    <network>
+        <buffermode>1</buffermode>
+        <cachemembuffersize>%d</cachemembuffersize>
+        <readbufferfactor>%.1f</readbufferfactor>
+    </network>
+    <video>
+        <memorysize>%d</memorysize>
+        <readbufferfactor>%.1f</readbufferfactor>
+    </video>
+    <cache>
+    </cache>
+</advancedsettings>''' % (buf, factor, buf, factor)
+
+        msg = ('Perfil IPTV (latencia baja):\n\n'
+               '- Buffer en memoria: %s\n'
+               '- ReadBufferFactor: %.1f\n'
+               '- Modo: RAM (sin disco)\n\n'
+               'Orientado a TV en directo / IPTV para minimizar retraso.\n'
+               '¿Aplicar?') % (format_size(buf), factor)
+        if not xbmcgui.Dialog().yesno('Perfil IPTV (latencia baja)', msg, yeslabel='Aplicar', nolabel='Cancelar'):
+            return
+
+        backup_advancedsettings(config_path)
+        parent = os.path.dirname(config_path)
+        try:
+            if parent and not os.path.exists(parent):
+                os.makedirs(parent, exist_ok=True)
+        except Exception:
+            pass
+        try:
+            with open(config_path, 'w', encoding='utf-8') as f:
+                f.write(config)
+        except Exception:
+            fh = xbmcvfs.File(config_path, 'w')
+            fh.write(config)
+            fh.close()
+        xbmcgui.Dialog().ok('Configuración aplicada', 'Perfil IPTV (latencia baja) aplicado. Reinicia Kodi para aplicar los cambios.')
+        log('Perfil IPTV (latencia baja) aplicado: buf=%s, factor=%.1f' % (format_size(buf), factor))
+    except Exception as e:
+        log('Error aplicando Perfil IPTV (latencia baja): %s' % str(e))
+        xbmcgui.Dialog().ok('Error', 'Error aplicando perfil IPTV: %s' % str(e))
 
 def streaming_mode_adjust(config_path):
     try:
