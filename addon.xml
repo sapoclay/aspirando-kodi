@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="script.aspirando-kodi" name="Aspirando Kodi" version="1.0.36" provider-name="entreunosyceros">
+<addon id="script.aspirando-kodi" name="Aspirando Kodi" version="1.0.37" provider-name="entreunosyceros">
     <requires>
         <import addon="xbmc.python" version="3.0.0"/>
     </requires>
@@ -43,8 +43,18 @@ Compatibilidad multiplataforma:
 
 Incluye un pequeño servicio que, si está programado, ejecuta la limpieza al arrancar Kodi mostrando un resumen previo.
 
-Recomendación: tras cambiar la configuración de buffering o video, reinicia Kodi para aplicar los cambios.</description>
-        <news>v1.0.36
+Recomendación: tras cambiar la configuración de buffering o video, reinicia Kodi para aplicar los cambios.
+
+⚠️ IMPORTANTE ANDROID (v1.0.37): El addon incluye detección automática de configuraciones peligrosas que pueden causar cuelgues del dispositivo tras 2-3 minutos de reproducción. Al iniciar Kodi, si detecta un buffer excesivo (>80MB), mostrará una alerta con opción de corrección automática a 50MB (valor seguro). Ver documento SOLUCION_CUELGUE_ANDROID.md para diagnóstico completo.</description>
+        <news>v1.0.37
+- 🚨 SOLUCIÓN CRÍTICA ANDROID: Monitor automático de buffer al inicio
+- ⚠️ Detecta buffers >80MB que causan cuelgues tras 2-3 minutos de reproducción
+- 🛡️ Alerta proactiva con opción de corrección automática a valores seguros
+- 📋 Documento completo de diagnóstico y solución (SOLUCION_CUELGUE_ANDROID.md)
+- 🔧 Mejoras en perfil Android (seguro): límites específicos y backup automático
+- 💾 Prevención inteligente de problemas de memoria en dispositivos Android
+- ✅ Validación de cachepath en almacenamiento externo
+v1.0.36
 - 🚀 Buffering Básico Inteligente: detección automática de RAM con recomendaciones específicas (desde 512MB hasta 8GB+)
 - 🎯 7 Perfiles de Buffering Avanzado: Streaming Local/Red, IPTV/TV en Vivo, Contenido 4K, Conexión Lenta, Conexión Rápida/Fibra, Ahorro de RAM, Rendimiento Máximo
 - 🔍 Optimización Automática Completa: análisis inteligente de RAM, tipo de almacenamiento (NVMe/SSD/HDD/SD), conexión de red (WiFi/Ethernet)

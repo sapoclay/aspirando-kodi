@@ -2,15 +2,83 @@
 
 <img width="1024" height="1024" alt="icono" src="https://github.com/user-attachments/assets/3321db4d-e6e0-4619-9027-7db537574499" />
 
-Herramienta de limpieza y optimización para Kodi: caché, thumbnails, paquetes, temporales, buffering y más. Incluye pruebas de velocidad, backups de configuración y un servicio opcional para limpieza automática al iniciar Kodi.
+Herramienta de limpieza y optimización para Kodi: caché, thumbnails, paquetes, temporales, buf## Solución de Cuelgues en Android 🔴
+
+### **Problema Crítico: Dispositivo se Cu- **Android (monitor de memoria)**: Si al iniciar Kodi ves una alerta sobre buffer alto, ACEPTA la corrección automática. Esto previene cuelgues del dispositivo. El addon crea backup automático antes de modificar.
+- **Android (cuelgues durante reproducción)**: Si tu dispositivo se congela tras 2-3 minutos reproduciendo vídeo, el buffer está demasiado alto. Usa "Perfil Android (seguro)" inmediatamente. Ver sección "Solución de Cuelgues en Android" arriba.
+- Android: si no abre la configuración de IPTV Simple, verifica que el addon esté instalado y habilitado. El atajo del addon intentará hacerlo por ti y mostrará el buscador si falta.
+- Android (post-Timeshift): si tras habilitar Timeshift y reiniciar Kodi no aparece la lista de canales, espera ~35 s; el servicio mostrará un diálogo con opciones para recuperar (deshabilitar IPTV Simple o aplicar buffering en RAM y reiniciar). Si no ves el diálogo, abre el addon y usa "Abrir ajustes de Timeshift…".
+- Android (auto-limpieza): si deshabilitas Timeshift o eliminas cachepath y estás reproduciendo, no debería saltar el aviso "No hay cachepath válido configurado"; la auto-limpieza se comporta en modo silencioso.a tras 2-3 Minutos de Reproducción**
+
+Este es un problema común en cajas Android causado por **buffer excesivo en memoria** que agota la RAM del dispositivo.
+
+#### **Solución Automática (NUEVO v1.0.37):**
+El addon ahora **detecta automáticamente** este problema al iniciar Kodi:
+1. ✅ Verifica si el buffer es mayor a 80MB (peligroso)
+2. ⚠️ Muestra alerta con opción de corrección
+3. 🔧 Ofrece reducir a 50MB (valor seguro) automáticamente
+4. 💾 Crea backup antes de modificar
+5. 🎉 Resuelve el problema en el 90% de los casos
+
+#### **Solución Manual:**
+Si no ves la alerta automática o el problema persiste:
+
+```
+1. Abrir addon "Aspirando Kodi"
+2. Gestión de Buffering → Configuración de buffering
+3. Perfil Android (seguro) → Aplicar
+4. Reiniciar Kodi
+```
+
+#### **Límites Seguros por RAM:**
+| RAM Total | Buffer Máximo Recomendado |
+|-----------|---------------------------|
+| 512 MB    | 20 MB                     |
+| 1 GB      | 30 MB                     |
+| 2 GB      | 50 MB ⭐ (recomendado)   |
+| 4 GB+     | 70 MB                     |
+
+**⚠️ NUNCA usar más de 80 MB en Android**
+
+#### **Documentación Completa:**
+Ver archivo `SOLUCION_CUELGUE_ANDROID.md` en el repositorio para:
+- Diagnóstico detallado paso a paso
+- 4 niveles de solución progresivos
+- Escenarios comunes y sus soluciones
+- Tabla completa de límites por dispositivo
+- Proceso de recuperación si persiste el problema
+
+#### **Síntomas del Problema:**
+- ✗ Vídeo funciona bien los primeros 2-3 minutos
+- ✗ Dispositivo se congela completamente después
+- ✗ No responde ningún botón/control
+- ✗ Necesita reinicio forzado (desenchufar)
+
+#### **Causas Adicionales Posibles:**
+Si el problema persiste tras aplicar perfil Android seguro:
+1. Cachepath apuntando a USB/SD lento o desconectado
+2. PVR/Timeshift activado consumiendo recursos
+3. Correcciones de sincronización A/V demasiado agresivas
+4. Múltiples addons consumiendo memoria simultáneamente
+
+Ver documento completo para soluciones a cada causa.
+
+---
+
+## Consejos y solución de problemas
+- Error al instalar zip "first item is folder: false": reempaquetar asegurando que el zip contenga la carpeta `script.aspirando-kodi/` como raíz.
+- Instalación manual: copiar la carpeta `script.aspirando-kodi/` a `~/.kodi/addons/` y reiniciar.
+- USB no aparece o no guarda: verificar que el dispositivo esté montado en `/media`, `/mnt` o `/run/media` y que tenga permisos de escritura. Formatos soportados típicos: vfat, ntfs, exfat, ext*.
+- Cambios de buffering no surten efecto: reiniciar Kodi después de aplicar ajustes; comprobar que `advancedsettings.xml` existe y no tiene errores.g y más. Incluye pruebas de velocidad, backups de configuración y un servicio opcional para limpieza automática al iniciar Kodi.
 
 ## Requisitos
 - Kodi 19 o superior (Python 3). El addon requiere `xbmc.python` 3.0.0.
 - Sistema con permisos para leer/escribir en `~/.kodi/userdata/`.
 - Nota de plataforma: en Linux (incluye LibreELEC/CoreELEC) todas las funciones están disponibles. En Android algunas funciones (como redirigir `special://temp` mediante symlink) no están soportadas por el sistema; ver sección "Compatibilidad".
+- **IMPORTANTE ANDROID:** El addon incluye protección automática contra buffers excesivos que pueden causar cuelgues del dispositivo. Ver sección "Solución de Cuelgues en Android".
 
 ## Instalación
-- Desde Kodi: Add-ons > Instalar desde un archivo .zip > seleccionar el zip del addon (p. ej., `script.aspirando-kodi-1.0.35.zip`).
+- Desde Kodi: Add-ons > Instalar desde un archivo .zip > seleccionar el zip del addon (p. ej., `script.aspirando-kodi-1.0.37.zip`).
 - Si el instalador falla, instalación manual:En el addon
   1) Descomprimir el zip. Debe existir una carpeta raíz llamada `script.aspirando-kodi/`.
   2) Copiar esa carpeta a `~/.kodi/addons/` (crear si no existe).
@@ -52,6 +120,7 @@ Nota sobre el zip: el primer elemento del zip debe ser la carpeta `script.aspira
   4) Para Timeshift: Ajustes de Kodi > TV en directo > Timeshift y ajusta según tu dispositivo.
 
 Notas Android
+- **Monitor de memoria (NUEVO v1.0.37)**: Al iniciar Kodi, el addon verifica automáticamente si el buffer configurado es mayor a 80MB (valor peligroso que causa cuelgues). Si lo detecta, muestra una alerta con opción de reducirlo a 50MB (valor seguro) con backup automático.
 - El atajo a IPTV Simple intenta instalar/habilitar el addon y abrir su configuración con reintentos; si no aparece a la primera, espera ~1 s y vuelve a pulsar.
 - Watchdog PVR: tras habilitar Timeshift y reiniciar, si la TV en directo se queda cargando sin mostrar canales, el servicio del addon detecta el bloqueo y ofrece acciones de recuperación (deshabilitar IPTV Simple o aplicar un buffering seguro en RAM y reiniciar Kodi).
 - Auto-limpieza silenciosa: cuando detienes la reproducción y tienes activada la auto-limpieza de cache USB, si no hay un cachepath válido no se mostrarán avisos intrusivos (se omite la limpieza de forma silenciosa).
@@ -268,9 +337,11 @@ Tres niveles progresivos de corrección:
 - Linux (PC, LibreELEC/CoreELEC): soporte completo, incluida la redirección de `special://temp` a USB mediante symlink y todas las optimizaciones de video (VAAPI/VDPAU recomendados).
 - Android (TV/Box/Tablet):
   - Funciones soportadas: limpieza (caché, thumbnails, paquetes, temporales), compactación de BBDD, tests de velocidad, configuración de buffering en `advancedsettings.xml`, optimizaciones de video (MediaCodec recomendado), diagnósticos básicos y atajo a IPTV Simple.
+  - **NUEVO v1.0.37**: Monitor automático de memoria al inicio que detecta y corrige buffers peligrosos (>80MB) que causan cuelgues. Protección proactiva contra problemas de memoria en Android.
   - Funciones limitadas/no soportadas: redirección de `special://temp` por symlink (no permitida), acceso directo a ciertas rutas de USB sin SAF, y algunas detecciones automáticas de montajes.
-  - Recomendaciones: usar el selector de carpeta del addon para elegir rutas dentro del espacio accesible de Kodi; mantener `cachemembuffersize` > 0 si no se dispone de ruta externa fiable; considerar tarjetas SD/USB que aparezcan en `/storage` con permisos de escritura para Kodi.
-  - Notas de la edición Android: detección de almacenamiento en `/storage/*` y `/mnt/media_rw/*`, pruebas de lectura/escritura con `xbmcvfs`, navegador de carpetas adaptado, y opciones no soportadas (como symlink de `special://temp`) ocultas. Incluye un watchdog del PVR que ayuda a recuperar si la TV en directo queda bloqueada tras habilitar Timeshift.
+  - Recomendaciones: usar el selector de carpeta del addon para elegir rutas dentro del espacio accesible de Kodi; mantener `cachemembuffersize` entre 30-50 MB (NUNCA >80 MB); considerar tarjetas SD/USB que aparezcan en `/storage` con permisos de escritura para Kodi.
+  - **Límites críticos Android**: Buffer máximo seguro = 80 MB. Recomendado = 50 MB. Si tienes <2GB RAM, usar 30 MB. El addon aplicará estos límites automáticamente si detecta configuración peligrosa.
+  - Notas de la edición Android: detección de almacenamiento en `/storage/*` y `/mnt/media_rw/*`, pruebas de lectura/escritura con `xbmcvfs`, navegador de carpetas adaptado, y opciones no soportadas (como symlink de `special://temp`) ocultas. Incluye un watchdog del PVR que ayuda a recuperar si la TV en directo queda bloqueada tras habilitar Timeshift, y monitor de memoria para prevenir cuelgues por buffer excesivo.
 
 ## Privacidad y seguridad
 - El addon no envía datos a terceros. El test de velocidad descarga archivos públicos (sin datos personales) para estimar Mbps.

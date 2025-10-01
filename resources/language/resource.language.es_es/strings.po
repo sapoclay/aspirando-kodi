@@ -1,7 +1,7 @@
 # XBMC Media Center language file
 # Addon Name: Aspirando Kodi
 # Addon id: script.aspirando-kodi
-# Addon version: 1.0.36
+# Addon version: 1.0.37
 # Addon Provider: entreunosyceros
 msgid ""
 msgstr ""

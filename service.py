@@ -147,7 +147,7 @@ if __name__ == '__main__':
         except Exception as e:
             log('No se pudo iniciar PlaybackMonitor: %s' % str(e))
 
-        # Watchdog Android: detectar bloqueo de PVR tras activar Timeshift
+        # Watchdog Android: detectar bloqueo de PVR tras activar Timeshift y problemas de memoria
         try:
             is_android = xbmc.getCondVisibility('system.platform.android')
         except Exception:
@@ -156,6 +156,77 @@ if __name__ == '__main__':
         # Verificar si el usuario ya manejó el problema de PVR en Android
         android_pvr_handled_file = os.path.join(addon_data_dir, 'android_pvr_handled.flag')
         android_pvr_already_handled = os.path.exists(android_pvr_handled_file)
+        
+        # NUEVO: Monitor de memoria en Android para evitar cuelgues
+        if is_android:
+            try:
+                # Verificar configuración de buffering segura para Android
+                import importlib.util, sys
+                addon_path = addon.getAddonInfo('path')
+                default_path = os.path.join(addon_path, 'default.py')
+                spec = importlib.util.spec_from_file_location('aspirando_default', default_path)
+                mod = importlib.util.module_from_spec(spec)
+                sys.modules['aspirando_default'] = mod
+                spec.loader.exec_module(mod)
+                
+                # Obtener paths
+                paths = mod.get_kodi_paths()
+                cfg = paths.get('advancedsettings', '')
+                
+                if os.path.exists(cfg):
+                    # Leer configuración actual
+                    try:
+                        with open(cfg, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        
+                        # Verificar si hay buffer excesivo (>80MB es peligroso en Android)
+                        import re
+                        mem_match = re.search(r'<cachemembuffersize>(\d+)</cachemembuffersize>', content)
+                        if mem_match:
+                            mem_size = int(mem_match.group(1))
+                            # Si el buffer es mayor a 80MB, avisar
+                            if mem_size > 83886080:  # 80MB
+                                dlg = xbmcgui.Dialog()
+                                if dlg.yesno('Advertencia: Buffer Alto en Android',
+                                            'Se detectó buffer de %s en memoria.\n'
+                                            'En Android esto puede causar cuelgues\n'
+                                            'tras 2-3 minutos de reproducción.\n\n'
+                                            '¿Reducir a un valor seguro (50MB)?' % mod.format_size(mem_size),
+                                            yeslabel='Sí, reducir', nolabel='Dejar así'):
+                                    # Aplicar perfil Android seguro
+                                    safe_config = '''<advancedsettings>
+    <network>
+        <buffermode>1</buffermode>
+        <cachemembuffersize>52428800</cachemembuffersize>
+        <readbufferfactor>3.2</readbufferfactor>
+    </network>
+    <video>
+        <memorysize>52428800</memorysize>
+        <readbufferfactor>3.2</readbufferfactor>
+    </video>
+    <cache>
+    </cache>
+</advancedsettings>'''
+                                    # Backup
+                                    try:
+                                        mod.backup_advancedsettings(cfg)
+                                    except Exception:
+                                        pass
+                                    
+                                    # Escribir configuración segura
+                                    try:
+                                        with open(cfg, 'w', encoding='utf-8') as f:
+                                            f.write(safe_config)
+                                        dlg.ok('Buffer Reducido',
+                                              'Se aplicó configuración segura (50MB).\n'
+                                              'Reinicia Kodi para aplicar cambios.')
+                                        log('Buffer reducido a 50MB por seguridad en Android')
+                                    except Exception as e:
+                                        log('Error reduciendo buffer: %s' % str(e))
+                    except Exception as e:
+                        log('Error verificando buffer en Android: %s' % str(e))
+            except Exception as e:
+                log('Error en monitor de memoria Android: %s' % str(e))
 
         if is_android and not android_pvr_already_handled:
             try:
