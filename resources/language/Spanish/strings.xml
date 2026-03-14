@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<strings>
+    <!-- Título de la categoría principal -->
+    <string id="30001">Configuración de Aspirando Kodi</string>
+    
+    <!-- Factor de Lectura Personalizado -->
+    <string id="30002">Usar Factor de Lectura personalizado</string>
+    <string id="30003">Valor del Factor de Lectura (1.0 - 8.0)</string>
+    
+    <!-- Optimizaciones para Android -->
+    <string id="30004">Habilitar optimizaciones para Android</string>
+    <string id="30005">Límite de buffer para Android</string>
+    
+    <!-- Sincronización de Audio/Video -->
+    <string id="30006">Habilitar correcciones de sincronización A/V</string>
+    <string id="30007">Corrección de retraso de video (ms)</string>
+    <string id="30008">Corrección de retraso de audio (ms)</string>
+    
+    <!-- Opciones Avanzadas de Buffering -->
+    <string id="30009">Usar buffering conservador (reduce cortes)</string>
+    <string id="30010">Habilitar precarga agresiva (carga más rápida)</string>
+</strings>

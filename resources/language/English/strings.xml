@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<strings>
+    <string id="30001">Buffering Configuration</string>
+    <string id="30002">ReadBufferFactor Settings</string>
+    <string id="30003">Use custom ReadBufferFactor</string>
+    <string id="30004">ReadBufferFactor value</string>
+    <string id="30005">Android Optimizations</string>
+    <string id="30006">Enable Android-specific optimizations</string>
+    <string id="30007">Buffer Limits</string>
+    <string id="30008">Maximum buffer size for Android (MB)</string>
+    <string id="30009">Audio/Video Synchronization</string>
+    <string id="30010">Enable audio/video sync corrections</string>
+    <string id="30011">Video delay correction (ms)</string>
+    <string id="30012">Audio delay correction (ms)</string>
+    <string id="30013">Advanced Buffering Options</string>
+    <string id="30014">Use conservative buffering (reduces stuttering)</string>
+    <string id="30015">Enable aggressive prefetch (faster loading)</string>
+</strings>

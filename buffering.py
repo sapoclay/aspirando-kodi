@@ -147,7 +147,6 @@ def detect_usb_devices():
     try:
         mount_bases = ['/media', '/mnt', '/run/media']
         if is_android():
-            # En Android intentamos en /storage y /mnt/media_rw
             mount_bases.extend(['/storage', '/mnt/media_rw'])
         for base_path in mount_bases:
             if os.path.exists(base_path):
@@ -421,32 +420,8 @@ def read_cachepath_from_config(config_path):
         log('Error leyendo cachepath: %s' % str(e))
     return None
 
-def clean_usb_cachepath(config_path):
-    try:
-        dialog = xbmcgui.Dialog()
-        cpath = read_cachepath_from_config(config_path)
-        if not cpath or not os.path.isdir(cpath):
-            temp_root = special_temp_path()
-            if os.path.islink(temp_root):
-                target_root = os.path.realpath(temp_root)
-                target_cache = os.path.join(target_root, 'cache')
-                use_target = target_cache if os.path.exists(target_cache) else target_root
-                msg = ('No hay cachepath en advancedsettings.xml.\n\n'
-                       'Se detectó redirección de special://temp a:\n%s\n\n'
-                       '¿Limpiar la carpeta de caché en ese destino?') % use_target
-                if dialog.yesno('Cache en USB (temp redirigido)', msg, yeslabel='Limpiar', nolabel='Cancelar'):
-                    removed_count, removed_size = safe_remove_folder_contents(use_target)
-                    dialog.ok('Cache en USB', 'Eliminados %d elementos (%s liberados).' % (removed_count, format_size(removed_size)))
-                    log('Limpieza via temp redirigido: %d, %s' % (removed_count, format_size(removed_size)))
-                return
-            dialog.ok('Cache USB', 'No hay cachepath válido configurado.')
-            return
-        removed_count, removed_size = safe_remove_folder_contents(cpath)
-        xbmcgui.Dialog().ok('Cache USB', 'Eliminados %d elementos (%s liberados).' % (removed_count, format_size(removed_size)))
-        log('Auto-limpieza manual: %d, %s' % (removed_count, format_size(removed_size)))
-    except Exception as e:
-        log('Error limpiando cache USB: %s' % str(e))
-        xbmcgui.Dialog().ok('Error', 'Error limpiando cache USB: %s' % str(e))
+def clean_usb_cachepath_legacy(config_path):
+    return clean_usb_cachepath(config_path, silent=False)
 
 # Necesitamos estas utilidades aquí; se pasarán desde default si están allí.
 # Para evitar circularidad, las reimplementamos mínimamente.
@@ -718,6 +693,112 @@ def optimize_buffering_auto(config_path):
     except Exception as e:
         log('Error en optimización automática: %s' % str(e))
         xbmcgui.Dialog().ok('Error', 'Error optimizando buffering: %s' % str(e))
+
+def configure_android_safe_profile(config_path):
+    """Perfil Android (seguro):
+    - RAM-only (sin cachepath)
+    - Buffer moderado (~50 MB)
+    - ReadBufferFactor conservador (~3.2)
+    - buffermode=1
+    """
+    try:
+        buf = 52428800  # 50 MB
+        factor = 3.2
+        config = '''<advancedsettings>
+    <network>
+        <buffermode>1</buffermode>
+        <cachemembuffersize>%d</cachemembuffersize>
+        <readbufferfactor>%.1f</readbufferfactor>
+    </network>
+    <video>
+        <memorysize>%d</memorysize>
+        <readbufferfactor>%.1f</readbufferfactor>
+    </video>
+    <cache>
+    </cache>
+</advancedsettings>''' % (buf, factor, buf, factor)
+
+        msg = ('Perfil Android (seguro):\n\n'
+               '- Buffer en memoria: %s\n'
+               '- ReadBufferFactor: %.1f\n'
+               '- Modo: RAM (sin disco)\n\n'
+               'Recomendado para cajas Android con buffering alto\n'
+               'o desincronización A/V. ¿Aplicar?') % (format_size(buf), factor)
+        if not xbmcgui.Dialog().yesno('Perfil Android (seguro)', msg, yeslabel='Aplicar', nolabel='Cancelar'):
+            return
+
+        backup_advancedsettings(config_path)
+        parent = os.path.dirname(config_path)
+        try:
+            if parent and not os.path.exists(parent):
+                os.makedirs(parent, exist_ok=True)
+        except Exception:
+            pass
+        try:
+            with open(config_path, 'w', encoding='utf-8') as f:
+                f.write(config)
+        except Exception:
+            fh = xbmcvfs.File(config_path, 'w')
+            fh.write(config)
+            fh.close()
+        xbmcgui.Dialog().ok('Configuración aplicada', 'Perfil Android (seguro) aplicado. Reinicia Kodi para aplicar los cambios.')
+        log('Perfil Android (seguro) aplicado: buf=%s, factor=%.1f' % (format_size(buf), factor))
+    except Exception as e:
+        log('Error aplicando Perfil Android (seguro): %s' % str(e))
+        xbmcgui.Dialog().ok('Error', 'Error aplicando perfil Android: %s' % str(e))
+
+def configure_iptv_low_latency_profile(config_path):
+    """Perfil IPTV (latencia baja):
+    - RAM-only (sin cachepath)
+    - Buffer pequeño (~32 MB) para reducir retraso
+    - ReadBufferFactor moderado (3.0)
+    - buffermode=1
+    """
+    try:
+        buf = 33554432  # 32 MB
+        factor = 3.0
+        config = '''<advancedsettings>
+    <network>
+        <buffermode>1</buffermode>
+        <cachemembuffersize>%d</cachemembuffersize>
+        <readbufferfactor>%.1f</readbufferfactor>
+    </network>
+    <video>
+        <memorysize>%d</memorysize>
+        <readbufferfactor>%.1f</readbufferfactor>
+    </video>
+    <cache>
+    </cache>
+</advancedsettings>''' % (buf, factor, buf, factor)
+
+        msg = ('Perfil IPTV (latencia baja):\n\n'
+               '- Buffer en memoria: %s\n'
+               '- ReadBufferFactor: %.1f\n'
+               '- Modo: RAM (sin disco)\n\n'
+               'Orientado a TV en directo / IPTV para minimizar retraso.\n'
+               '¿Aplicar?') % (format_size(buf), factor)
+        if not xbmcgui.Dialog().yesno('Perfil IPTV (latencia baja)', msg, yeslabel='Aplicar', nolabel='Cancelar'):
+            return
+
+        backup_advancedsettings(config_path)
+        parent = os.path.dirname(config_path)
+        try:
+            if parent and not os.path.exists(parent):
+                os.makedirs(parent, exist_ok=True)
+        except Exception:
+            pass
+        try:
+            with open(config_path, 'w', encoding='utf-8') as f:
+                f.write(config)
+        except Exception:
+            fh = xbmcvfs.File(config_path, 'w')
+            fh.write(config)
+            fh.close()
+        xbmcgui.Dialog().ok('Configuración aplicada', 'Perfil IPTV (latencia baja) aplicado. Reinicia Kodi para aplicar los cambios.')
+        log('Perfil IPTV (latencia baja) aplicado: buf=%s, factor=%.1f' % (format_size(buf), factor))
+    except Exception as e:
+        log('Error aplicando Perfil IPTV (latencia baja): %s' % str(e))
+        xbmcgui.Dialog().ok('Error', 'Error aplicando perfil IPTV: %s' % str(e))
 
 def streaming_mode_adjust(config_path):
     try:
@@ -1165,16 +1246,50 @@ def save_buffering_config_to_usb(config_path):
         log('Error general en save_buffering_config_to_usb: %s' % str(e))
         xbmcgui.Dialog().ok('Error', 'Error guardando en USB: %s' % str(e))
 
+def clean_usb_cachepath(config_path, silent=False):
+    try:
+        dialog = xbmcgui.Dialog()
+        cpath = read_cachepath_from_config(config_path)
+        if not cpath or not os.path.isdir(cpath):
+            temp_root = special_temp_path()
+            if os.path.islink(temp_root):
+                target_root = os.path.realpath(temp_root)
+                target_cache = os.path.join(target_root, 'cache')
+                use_target = target_cache if os.path.exists(target_cache) else target_root
+                msg = ('No hay cachepath en advancedsettings.xml.\n\n'
+                       'Se detectó redirección de special://temp a:\n%s\n\n'
+                       '¿Limpiar la carpeta de caché en ese destino?') % use_target
+                if not silent and dialog.yesno('Cache en USB (temp redirigido)', msg, yeslabel='Limpiar', nolabel='Cancelar'):
+                    removed_count, removed_size = safe_remove_folder_contents(use_target)
+                    dialog.ok('Cache en USB', 'Eliminados %d elementos (%s liberados).' % (removed_count, format_size(removed_size)))
+                    log('Limpieza via temp redirigido: %d, %s' % (removed_count, format_size(removed_size)))
+                elif silent:
+                    removed_count, removed_size = safe_remove_folder_contents(use_target)
+                    log('Limpieza via temp redirigido (silent): %d, %s' % (removed_count, format_size(removed_size)))
+                return
+            if not silent:
+                dialog.ok('Cache USB', 'No hay cachepath válido configurado.')
+            return
+        removed_count, removed_size = safe_remove_folder_contents(cpath)
+        if not silent:
+            xbmcgui.Dialog().ok('Cache USB', 'Eliminados %d elementos (%s liberados).' % (removed_count, format_size(removed_size)))
+        log('Auto-limpieza manual: %d, %s (silent=%s)' % (removed_count, format_size(removed_size), silent))
+    except Exception as e:
+        log('Error limpiando cache USB: %s' % str(e))
+        if not silent:
+            xbmcgui.Dialog().ok('Error', 'Error limpiando cache USB: %s' % str(e))
+
 def configure_usb_cachepath(config_path):
+    """Configura directamente un almacenamiento externo como cachepath."""
     try:
         dialog = xbmcgui.Dialog()
         devices = detect_usb_devices()
         if not devices:
             sel = browse_for_usb_folder()
             if sel:
-                devices = [{'name': os.path.basename(sel) or 'USB seleccionado', 'path': sel}]
+                devices = [{'name': os.path.basename(sel) or device_label(), 'path': sel}]
         if not devices:
-            dialog.ok('Sin %s' % device_label(), 'No se detectaron %s y no se seleccionó carpeta.' % device_label().lower())
+            dialog.ok('Sin %s' % device_label(), 'No se detectaron ubicaciones y no se seleccionó carpeta.' % device_label().lower())
             return
         labels = ['%s (%s)' % (d['path'], d.get('free', '')) for d in devices]
         idx = dialog.select('Selecciona %s para cache' % device_label(), labels)
@@ -1186,6 +1301,7 @@ def configure_usb_cachepath(config_path):
             os.makedirs(cache_dir, exist_ok=True)
         except Exception:
             pass
+
         config = '''<advancedsettings>
     <network>
         <buffermode>2</buffermode>
@@ -1200,6 +1316,7 @@ def configure_usb_cachepath(config_path):
         <cachepath>%s</cachepath>
     </cache>
 </advancedsettings>''' % cache_dir
+
         backup_advancedsettings(config_path)
         parent = os.path.dirname(config_path)
         try:
@@ -1217,7 +1334,7 @@ def configure_usb_cachepath(config_path):
         dialog.ok('Cache externa configurada', 'cachepath: %s\nReinicia Kodi para aplicar.' % cache_dir)
         log('cachepath configurado en: %s' % cache_dir)
     except Exception as e:
-        log('Error configurando USB como cache: %s' % str(e))
+        log('Error configurando %s como cache: %s' % (device_label(), str(e)))
         xbmcgui.Dialog().ok('Error', 'Error configurando cache en almacenamiento externo: %s' % str(e))
 
 def configure_external_cachepath_android(config_path):
@@ -1351,19 +1468,21 @@ def speed_test_and_recommend(config_path, urls=None):
                 mbps, read_bytes/1024/1024, elapsed, format_size(bufsize), factor)
         if not dialog.yesno('Test de velocidad', msg, yeslabel='Aplicar', nolabel='Cancelar'):
             return
-        config = '''<advancedsettings>
-    <network>
-        <buffermode>1</buffermode>
-        <cachemembuffersize>%d</cachemembuffersize>
-        <readbufferfactor>%.1f</readbufferfactor>
-    </network>
-    <video>
-        <memorysize>%d</memorysize>
-        <readbufferfactor>%.1f</readbufferfactor>
-    </video>
-    <cache>
-    </cache>
-</advancedsettings>''' % (bufsize, factor, bufsize, factor)
+        config = (
+            '<advancedsettings>\n'
+            '    <network>\n'
+            '        <buffermode>1</buffermode>\n'
+            '        <cachemembuffersize>{bufsize}</cachemembuffersize>\n'
+            '        <readbufferfactor>{factor:.1f}</readbufferfactor>\n'
+            '    </network>\n'
+            '    <video>\n'
+            '        <memorysize>{bufsize}</memorysize>\n'
+            '        <readbufferfactor>{factor:.1f}</readbufferfactor>\n'
+            '    </video>\n'
+            '    <cache>\n'
+            '    </cache>\n'
+            '</advancedsettings>'
+        ).format(bufsize=bufsize, factor=factor)
         backup_advancedsettings(config_path)
         parent = os.path.dirname(config_path)
         try:

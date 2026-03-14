@@ -1,2 +1,9 @@
 script.aspirando-kodi*
 script.aspirando-kodi/
+__pycache__
+dist/
+.venv/
+xbmc.py
+xbmcaddon.py
+xbmcgui.py
+xbmcvfs.py
