@@ -1,5 +1,7 @@
 # Aspirando Kodi
 
+
+
 Addon para Kodi orientado a limpieza, mantenimiento y optimización de reproducción. Permite limpiar residuos que afectan al streaming y a listas M3U/IPTV, ajustar buffering, trabajar con almacenamiento USB y automatizar limpiezas al iniciar Kodi.
 
 ## Versión actual
