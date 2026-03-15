@@ -26,6 +26,27 @@ Addon para Kodi orientado a limpieza, mantenimiento y optimización de reproducc
 
 ## Instalación
 
+### Desde el Repositorio (Recomendado)
+
+Para mantener el addon actualizado automáticamente, te recomendamos añadir la fuente oficial a tu instalación de Kodi.
+
+### 1. Añadir la fuente a Kodi
+1. Abre **Kodi** y haz clic en el icono de **Ajustes** (la rueda dentada).
+2. Entra en **Explorador de archivos** (File Manager).
+3. Haz clic en **Añadir fuente** (Add source).
+4. En el campo `<Ninguno>`, escribe exactamente la siguiente URL:
+   `https://sapoclay.github.io/aspirando-kodi/`
+5. En el nombre de la fuente, escribe **Aspirando** (o el nombre que prefieras) y pulsa **OK**.
+
+### 2. Instalar el Addon
+1. Regresa al menú principal de Kodi y entra en la sección **Add-ons**.
+2. Haz clic en el icono de la **caja abierta** (Instalador de paquetes) en la esquina superior izquierda.
+3. Selecciona **Instalar desde archivo zip**.
+4. *(Si es la primera vez, Kodi te pedirá activar "Orígenes desconocidos" en Ajustes. Hazlo y vuelve a este paso).*
+5. Busca y selecciona la fuente **Aspirando** que añadiste anteriormente.
+6. Haz clic en el archivo `.zip` disponible (ej: `script.aspirando-kodi-x.x.x.zip`).
+7. Espera unos segundos hasta que aparezca la notificación de **"Add-on instalado"**.
+
 ### Desde Kodi
 
 1. Abre Kodi.
