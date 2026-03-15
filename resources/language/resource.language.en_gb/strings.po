@@ -56,3 +56,15 @@ msgstr "Use conservative buffering (reduces stuttering)"
 msgctxt "#30010"
 msgid "Enable aggressive prefetch (faster loading)"
 msgstr "Enable aggressive prefetch (faster loading)"
+
+msgctxt "#30016"
+msgid "Check for updates automatically on Kodi startup"
+msgstr "Check for updates automatically on Kodi startup"
+
+msgctxt "#30017"
+msgid "Update check interval"
+msgstr "Update check interval"
+
+msgctxt "#30018"
+msgid "Install updates automatically when available"
+msgstr "Install updates automatically when available"

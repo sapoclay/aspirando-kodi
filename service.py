@@ -5,6 +5,7 @@ import json
 import os
 import time
 import xbmcvfs
+import updater
 from typing import Any, cast
 
 # Servicio de arranque: ejecuta limpieza si está programada
@@ -131,6 +132,51 @@ class PlaybackMonitor(KodiPlayerBase):
             log('Auto-limpieza cache USB falló: %s' % str(e))
 
 
+def run_auto_update_check():
+    if not updater.is_auto_update_enabled():
+        log('Comprobacion automatica de actualizaciones desactivada')
+        return
+
+    try:
+        result = updater.check_for_updates(force=False, ignore_ignored=False)
+        if not result.get('ok'):
+            log('No se pudo comprobar actualizaciones: %s' % result.get('error', 'Error desconocido'))
+            return
+
+        if not result.get('available'):
+            if result.get('available_remotely') and result.get('ignored'):
+                log('Actualizacion %s omitida previamente por el usuario' % result.get('remote_version', ''))
+            else:
+                log('No hay actualizaciones pendientes')
+            return
+
+        log('Nueva version disponible: %s' % result.get('remote_version', ''))
+        if updater.is_auto_install_enabled():
+            install_result = updater.install_update(result, interactive=False)
+            xbmcgui.Dialog().notification(
+                addon_name,
+                'Actualizacion %s instalada. Reinicia Kodi.' % install_result.get('remote_version', result.get('remote_version', '')),
+                time=5000,
+            )
+            updater.prompt_restart_after_update()
+            return
+
+        message = updater.build_update_message(result) + '\n\n¿Descargar e instalar ahora la actualizacion?'
+        if xbmcgui.Dialog().yesno('Actualizacion disponible', message, yeslabel='Actualizar', nolabel='Omitir'):
+            install_result = updater.install_update(result, interactive=True)
+            xbmcgui.Dialog().notification(
+                addon_name,
+                'Actualizacion %s instalada correctamente' % install_result.get('remote_version', result.get('remote_version', '')),
+                time=5000,
+            )
+            updater.prompt_restart_after_update()
+        else:
+            updater.ignore_version(result.get('remote_version', ''))
+            log('Usuario omitio la actualizacion %s en el arranque' % result.get('remote_version', ''))
+    except Exception as error:
+        log('Error durante la actualizacion automatica: %s' % str(error))
+
+
 if __name__ == '__main__':
     try:
         # Esperar a que Kodi esté listo
@@ -158,6 +204,8 @@ if __name__ == '__main__':
                 log('Error leyendo programación: %s' % str(e))
         else:
             log('Sin limpieza programada')
+
+        run_auto_update_check()
 
         # Cargar módulo principal para utilidades y activar monitor de reproducción
         try:

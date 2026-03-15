@@ -15,4 +15,7 @@
     <string id="30013">Advanced Buffering Options</string>
     <string id="30014">Use conservative buffering (reduces stuttering)</string>
     <string id="30015">Enable aggressive prefetch (faster loading)</string>
+    <string id="30016">Check for updates automatically on Kodi startup</string>
+    <string id="30017">Update check interval</string>
+    <string id="30018">Install updates automatically when available</string>
 </strings>

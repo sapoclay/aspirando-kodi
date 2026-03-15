@@ -13,6 +13,7 @@ import subprocess
 import re
 import datetime
 import buffering as buffering_module
+import updater
 from buffering import (
     get_default_kodi_values,
     configure_basic_buffering,
@@ -5152,6 +5153,40 @@ def restart_kodi():
         log('Error en restart_kodi: %s' % str(e))
         xbmcgui.Dialog().ok('Error', 'Error reiniciando Kodi: %s' % str(e))
 
+
+def check_addon_updates():
+    """Comprueba e instala actualizaciones del addon desde la URL oficial"""
+    try:
+        log('Comprobando actualizaciones del addon')
+        dialog = xbmcgui.Dialog()
+        result = updater.check_for_updates(force=True, ignore_ignored=True)
+
+        if not result.get('ok'):
+            dialog.ok('Actualizaciones', 'No se pudo comprobar si hay actualizaciones.\n\n%s' % result.get('error', 'Error desconocido'))
+            return
+
+        if not result.get('available_remotely'):
+            dialog.ok('Actualizaciones', 'Ya tienes instalada la ultima version disponible.\n\n%s' % updater.build_update_message(result))
+            return
+
+        message = updater.build_update_message(result) + '\n\n¿Descargar e instalar ahora la actualizacion?'
+        if not dialog.yesno('Actualizacion disponible', message, yeslabel='Actualizar', nolabel='Mas tarde'):
+            log('Usuario aplazo la actualizacion manual a %s' % result.get('remote_version', ''))
+            return
+
+        install_result = updater.install_update(result, interactive=True)
+        dialog.ok(
+            'Actualizacion instalada',
+            'Se ha instalado la version %s correctamente.\n\nArchivos actualizados: %d' % (
+                install_result.get('remote_version', result.get('remote_version', '')),
+                int(install_result.get('copied_files', 0) or 0),
+            ),
+        )
+        updater.prompt_restart_after_update()
+    except Exception as e:
+        log('Error actualizando addon: %s' % str(e))
+        xbmcgui.Dialog().ok('Actualizaciones', 'Error durante la actualizacion: %s' % str(e))
+
 def main():
     """Función principal del addon con bucle continuo"""
     log('Iniciando Aspirando Kodi v%s' % addon_version)
@@ -5173,6 +5208,7 @@ def main():
                 'Gestión de Buffering',
                 'Restaurar valores predeterminados',
                 'Resetear aviso PVR Android',
+                'Buscar actualizaciones',
                 'Reiniciar Kodi',
                 'Acerca de',
                 'Salir'
@@ -5180,7 +5216,7 @@ def main():
             
             seleccion = dialog.select('Aspirando Kodi - Menú Principal', opciones)
             
-            if seleccion == -1 or seleccion == 13:  # Usuario canceló o seleccionó Salir
+            if seleccion == -1 or seleccion == 14:  # Usuario canceló o seleccionó Salir
                 log('Usuario salió del addon')
                 break
             
@@ -5228,14 +5264,18 @@ def main():
                 log('Usuario seleccionó: Resetear aviso PVR Android')
                 reset_android_pvr_warning()
                 
-            elif seleccion == 11:  # Reiniciar Kodi
+            elif seleccion == 11:  # Buscar actualizaciones
+                log('Usuario seleccionó: Buscar actualizaciones')
+                check_addon_updates()
+
+            elif seleccion == 12:  # Reiniciar Kodi
                 log('Usuario seleccionó: Reiniciar Kodi')
                 restart_kodi()
                 # Si el usuario confirma reiniciar, salimos del bucle
                 # porque Kodi se va a reiniciar
                 break
                 
-            elif seleccion == 12:  # Acerca de
+            elif seleccion == 13:  # Acerca de
                 log('Usuario seleccionó: Acerca de')
                 show_about()
                 

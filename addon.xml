@@ -45,8 +45,15 @@ Incluye un pequeño servicio que, si está programado, ejecuta la limpieza al ar
 
 Recomendación: tras cambiar la configuración de buffering o video, reinicia Kodi para aplicar los cambios.
 
-⚠️ IMPORTANTE ANDROID (v1.0.37): El addon incluye detección automática de configuraciones peligrosas que pueden causar cuelgues del dispositivo tras 2-3 minutos de reproducción. Al iniciar Kodi, si detecta un buffer excesivo (>80MB), mostrará una alerta con opción de corrección automática a 50MB (valor seguro). Ver documento SOLUCION_CUELGUE_ANDROID.md para diagnóstico completo.</description>
-        <news>v1.0.37
+⚠️ IMPORTANTE ANDROID (v1.0.37): El addon incluye detección automática de configuraciones peligrosas que pueden causar cuelgues del dispositivo tras 2-3 minutos de reproducción. Al iniciar Kodi, si detecta un buffer excesivo (>80MB), mostrará una alerta con opción de corrección automática a 50MB (valor seguro). Ver documento SOLUCION_CUELGUE_ANDROID.md para diagnóstico completo.
+
+Actualizaciones del addon (v1.0.37): el addon puede comprobar nuevas versiones desde https://sapoclay.github.io/aspirando-kodi/, descargar el zip publicado e instalarlo desde el propio addon o automaticamente al iniciar Kodi.</description>
+    <news>v1.0.37
+- Nuevo sistema de actualizacion desde https://sapoclay.github.io/aspirando-kodi/
+- Comprobacion manual desde el menu principal
+- Comprobacion automatica configurable al iniciar Kodi
+- Descarga directa del zip publicado en la web oficial
+- Instalacion directa del paquete descargado con backup previo del addon
 - 🚨 SOLUCIÓN CRÍTICA ANDROID: Monitor automático de buffer al inicio
 - ⚠️ Detecta buffers >80MB que causan cuelgues tras 2-3 minutos de reproducción
 - 🛡️ Alerta proactiva con opción de corrección automática a valores seguros

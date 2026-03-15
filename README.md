@@ -25,6 +25,7 @@ Addon para Kodi orientado a limpieza, mantenimiento y optimización de reproducc
 - Acceso a utilidades de IPTV Simple y Timeshift.
 - Limpieza programada al iniciar Kodi.
 - Auto-limpieza silenciosa del caché USB al parar la reproducción.
+- Sistema de actualización integrado desde la URL oficial.
 
 ## Instalación
 
@@ -32,7 +33,10 @@ Addon para Kodi orientado a limpieza, mantenimiento y optimización de reproducc
 
 Para mantener el addon actualizado automáticamente, te recomendamos añadir la fuente oficial a tu instalación de Kodi.
 
+El addon incorpora además un actualizador propio capaz de comprobar nuevas versiones en `https://sapoclay.github.io/aspirando-kodi/`, descargar el zip publicado e instalarlo desde el propio addon.
+
 ### 1. Añadir la fuente a Kodi
+
 1. Abre **Kodi** y haz clic en el icono de **Ajustes** (la rueda dentada).
 2. Entra en **Explorador de archivos** (File Manager).
 3. Haz clic en **Añadir fuente** (Add source).
@@ -41,6 +45,7 @@ Para mantener el addon actualizado automáticamente, te recomendamos añadir la 
 5. En el nombre de la fuente, escribe **Aspirando** (o el nombre que prefieras) y pulsa **OK**.
 
 ### 2. Instalar el Addon
+
 1. Regresa al menú principal de Kodi y entra en la sección **Add-ons**.
 2. Haz clic en el icono de la **caja abierta** (Instalador de paquetes) en la esquina superior izquierda.
 3. Selecciona **Instalar desde archivo zip**.
@@ -54,10 +59,6 @@ Para mantener el addon actualizado automáticamente, te recomendamos añadir la 
 1. Abre Kodi.
 2. Ve a Add-ons > Instalar desde un archivo .zip.
 3. Selecciona el paquete del addon.
-
-Paquete generado en este proyecto:
-
-- `dist/script.aspirando-kodi-1.0.37.zip`
 
 ### Instalación manual
 
@@ -95,6 +96,18 @@ El addon puede programar una limpieza:
 - desactivada
 
 El servicio se ha optimizado para consumir menos recursos y reutiliza el módulo principal al ejecutar la limpieza automática.
+
+## Actualizaciones del addon
+
+Desde el menú principal puedes usar `Buscar actualizaciones` para forzar la comprobación remota e instalar la nueva versión al momento.
+
+Desde los ajustes del addon puedes controlar:
+
+- si se comprueban actualizaciones al iniciar Kodi
+- cada cuánto tiempo se vuelve a consultar la URL oficial
+- si la instalación debe hacerse automáticamente cuando haya una nueva versión
+
+El actualizador usa directamente el zip publicado en la web oficial y mantiene únicamente diferencias de comportamiento por plataforma para el reinicio posterior a la instalación.
 
 ## Gestión de Buffering
 

@@ -19,4 +19,7 @@
     <!-- Opciones Avanzadas de Buffering -->
     <string id="30009">Usar buffering conservador (reduce cortes)</string>
     <string id="30010">Habilitar precarga agresiva (carga más rápida)</string>
+    <string id="30016">Comprobar actualizaciones automaticamente al iniciar Kodi</string>
+    <string id="30017">Intervalo de comprobacion de actualizaciones</string>
+    <string id="30018">Instalar actualizaciones automaticamente cuando haya una nueva version</string>
 </strings>
